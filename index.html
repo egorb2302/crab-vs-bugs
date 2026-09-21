@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <title>Crab vs Bugs — a tiny pixel platformer</title>
+    <meta name="description" content="Help a little orange crab squash bugs, grab coins and reach the flag. A two-minute pixel platformer that plays right in your browser." />
+    <meta name="theme-color" content="#1a1c2c" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Crab vs Bugs" />
+    <meta property="og:description" content="A little orange crab, a level full of bugs. Two-minute pixel platformer — plays right in your browser, phone included." />
+    <meta property="og:url" content="__SITE_URL__/" />
+    <meta property="og:image" content="__SITE_URL__/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Crab vs Bugs" />
+    <meta name="twitter:description" content="A little orange crab, a level full of bugs. Two-minute pixel platformer — plays right in your browser, phone included." />
+    <meta name="twitter:image" content="__SITE_URL__/og.png" />
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #1a1c2c;
+        overscroll-behavior: none;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+
+      #game {
+        display: block;
+        outline: none;
+      }
+
+      /* on-screen controls: only on touch devices, only while a level is running */
+      #touch {
+        position: fixed;
+        inset: auto 0 0 0;
+        display: none;
+        justify-content: space-between;
+        align-items: flex-end;
+        padding: 0 max(18px, env(safe-area-inset-right)) max(22px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+        pointer-events: none;
+      }
+
+      .touch.playing #touch {
+        display: flex;
+      }
+
+      /* portrait: keep the playfield clear of thumbs by reserving the bottom strip for the pad */
+      @media (orientation: portrait) {
+        .touch #stage {
+          bottom: 170px;
+        }
+      }
+
+      #pad {
+        display: flex;
+        gap: 10px;
+        pointer-events: auto;
+      }
+
+      .key {
+        width: 76px;
+        height: 76px;
+        display: grid;
+        place-items: center;
+        box-sizing: border-box;
+        border: 3px solid rgba(244, 244, 244, 0.4);
+        background: rgba(244, 244, 244, 0.08);
+        color: rgba(244, 244, 244, 0.75);
+        pointer-events: auto;
+      }
+
+      .key.jump {
+        width: 92px;
+        height: 92px;
+        border-color: rgba(217, 119, 87, 0.75);
+        background: rgba(217, 119, 87, 0.16);
+        color: #d97757;
+      }
+
+      .key.down {
+        background: rgba(244, 244, 244, 0.28);
+      }
+
+      .key.jump.down {
+        background: rgba(217, 119, 87, 0.45);
+      }
+
+      .key svg {
+        width: 34px;
+        height: 34px;
+        fill: currentColor;
+        shape-rendering: crispEdges;
+        pointer-events: none;
+      }
+
+      noscript {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #f4f4f4;
+        font: 16px/1.4 monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"><canvas id="game"></canvas></div>
+
+    <div id="touch" aria-hidden="true">
+      <div id="pad">
+        <div class="key" data-side="left">
+          <svg viewBox="0 0 7 7"><path d="M4 0h1v7H4zM3 1h1v5H3zM2 2h1v3H2zM1 3h1v1H1z" /></svg>
+        </div>
+        <div class="key" data-side="right">
+          <svg viewBox="0 0 7 7"><path d="M2 0h1v7H2zM3 1h1v5H3zM4 2h1v3H4zM5 3h1v1H5z" /></svg>
+        </div>
+      </div>
+      <div class="key jump" id="jump">
+        <svg viewBox="0 0 7 7"><path d="M0 4h7v1H0zM1 3h5v1H1zM2 2h3v1H2zM3 1h1v1H3z" /></svg>
+      </div>
+    </div>
+
+    <noscript>This game needs JavaScript.</noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
