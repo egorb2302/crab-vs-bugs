@@ -1,7 +1,7 @@
 // One input state for keyboard and the on-screen pad.
 // Keys are matched by physical position (event.code), so WASD works on any layout.
 
-export type Action = "left" | "right" | "jump" | "confirm" | "mute";
+export type Action = "left" | "right" | "jump" | "confirm" | "mute" | "restart" | "back";
 
 const KEYS: Record<string, Action> = {
   ArrowLeft: "left",
@@ -14,6 +14,8 @@ const KEYS: Record<string, Action> = {
   Enter: "confirm",
   NumpadEnter: "confirm",
   KeyM: "mute",
+  KeyR: "restart",
+  Escape: "back",
 };
 
 // an action is held while at least one source (a key code or "touch") holds it

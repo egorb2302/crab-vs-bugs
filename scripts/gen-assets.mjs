@@ -78,6 +78,12 @@ class Img {
     const rgba = typeof color === "string" ? hex(color) : color;
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) this.set(x, y, rgba);
   }
+  // set() ignores transparent pixels (that's what makes blit skip them), so punching a hole needs its own path
+  clear(x0, y0, w, h) {
+    for (let y = Math.max(0, y0); y < Math.min(this.h, y0 + h); y++) {
+      this.data.fill(0, (y * this.w + Math.max(0, x0)) * 4, (y * this.w + Math.min(this.w, x0 + w)) * 4);
+    }
+  }
   // nearest-neighbour blit, optional horizontal flip / flat tint (for shadows)
   blit(src, dx, dy, scale = 1, { flipX = false, tint = null } = {}) {
     for (let y = 0; y < src.h; y++) {
@@ -302,14 +308,40 @@ const coinEdge = fromGrid("coin.edge", [
 const coinSheet = sheet([coinFull, coinHalf, coinEdge, coinHalf]);
 
 // ---------------------------------------------------------------- tiles
+// One set of grids, one palette per location. Chars: L/G/t surface, p/q/l body,
+// s/S spikes (same silver everywhere — a hazard must read as a hazard), w/W/x liquid.
 
-const TILE_PAL = {
-  L: "#a7f070", G: "#38b764", t: "#257179",
-  p: "#4b3d63", q: "#392d4f", l: "#63527f",
-  s: "#dfe7ee", S: "#8093ab",
+const TILE_PALS = {
+  meadow: {
+    L: "#a7f070", G: "#38b764", t: "#257179",
+    p: "#4b3d63", q: "#392d4f", l: "#63527f",
+    w: "#73eff7", W: "#41a6f6", x: "#29366f",
+  },
+  desert: {
+    L: "#ffcd75", G: "#ef7d57", t: "#b13e53",
+    p: "#7a4a3a", q: "#5e3a2e", l: "#8f5a46",
+    w: "#73eff7", W: "#41a6f6", x: "#29366f",
+  },
+  cavern: {
+    L: "#94b0c2", G: "#566c86", t: "#333c57",
+    p: "#2b2f45", q: "#1f2335", l: "#3c4361",
+    w: "#73eff7", W: "#41a6f6", x: "#29366f",
+  },
+  frost: {
+    L: "#f4f4f4", G: "#dfe7ee", t: "#94b0c2",
+    p: "#465b7d", q: "#36486a", l: "#5a729a",
+    w: "#73eff7", W: "#41a6f6", x: "#29366f",
+  },
+  magma: {
+    L: "#7a5560", G: "#5d3a4a", t: "#45283c",
+    p: "#2f1e2b", q: "#241722", l: "#8b3a4a",
+    w: "#ffcd75", W: "#ef7d57", x: "#b13e53",
+  },
 };
 
-const tileGrass = fromGrid("tile.grass", [
+const SPIKE_PAL = { s: "#dfe7ee", S: "#8093ab" };
+
+const TILE_TOP = [
   "LLLLLLLLLLLLLLLL",
   "GLGGGGLGGGGGLGGG",
   "GGGGGGGGGGGGGGGG",
@@ -326,9 +358,9 @@ const tileGrass = fromGrid("tile.grass", [
   "plpppppppppppppp",
   "ppppppplpppppqpp",
   "pppppppppppppppp",
-], TILE_PAL);
+];
 
-const tileDirt = fromGrid("tile.dirt", [
+const TILE_BODY = [
   "pppppppppppppppp",
   "pppqpppppppplppp",
   "pppppppppppppppp",
@@ -345,9 +377,9 @@ const tileDirt = fromGrid("tile.dirt", [
   "pppppppppppqpppp",
   "ppplpppppppppppp",
   "pppppppppppppppp",
-], TILE_PAL);
+];
 
-const tileSpikes = fromGrid("tile.spikes", [
+const TILE_SPIKES = [
   ...Array(8).fill("................"),
   "...sS......sS...",
   "...sS......sS...",
@@ -357,10 +389,55 @@ const tileSpikes = fromGrid("tile.spikes", [
   ".sssSSS..sssSSS.",
   "ssssSSSSssssSSSS",
   "ssssSSSSssssSSSS",
-], TILE_PAL);
+];
 
-// frames: 0 grass, 1 dirt, 2 spikes
-const tileSheet = sheet([tileGrass, tileDirt, tileSpikes]);
+// surface of a pool: a bright, restless line, then the body colour
+const TILE_LIQUID_TOP = [
+  "wwWwwwwwWwwwwWww",
+  "WWWwWWWWwWWWWwWW",
+  "WWWWWWWWWWWWWWWW",
+  "WxWWWWWxWWWWWWWW",
+  "xxxxxxxxxxxxxxxx",
+  "xxxxWxxxxxxxWxxx",
+  ...Array(10).fill("xxxxxxxxxxxxxxxx"),
+];
+
+const TILE_LIQUID_BODY = [
+  ...Array(3).fill("xxxxxxxxxxxxxxxx"),
+  "xxxWxxxxxxxxxxWx",
+  ...Array(4).fill("xxxxxxxxxxxxxxxx"),
+  "xxxxxxxWxxxxxxxx",
+  ...Array(7).fill("xxxxxxxxxxxxxxxx"),
+];
+
+// frames: 0 surface, 1 body, 2 spikes, 3 liquid surface, 4 liquid body
+function tileSheetFor(name) {
+  const pal = { ...TILE_PALS[name], ...SPIKE_PAL };
+  return sheet([
+    fromGrid(`${name}.top`, TILE_TOP, pal),
+    fromGrid(`${name}.body`, TILE_BODY, pal),
+    fromGrid(`${name}.spikes`, TILE_SPIKES, pal),
+    fromGrid(`${name}.liquidTop`, TILE_LIQUID_TOP, pal),
+    fromGrid(`${name}.liquidBody`, TILE_LIQUID_BODY, pal),
+  ]);
+}
+
+const THEMES = Object.keys(TILE_PALS);
+const tileGrass = fromGrid("meadow.top", TILE_TOP, { ...TILE_PALS.meadow, ...SPIKE_PAL }); // used by the OG image
+
+// ---------------------------------------------------------------- moving platform (32x8)
+
+function platformImg() {
+  const img = new Img(32, 8);
+  img.fill(0, 0, 32, 1, "#dfe7ee");
+  img.fill(0, 1, 32, 3, "#8093ab");
+  img.fill(0, 4, 32, 2, "#566c86");
+  img.fill(0, 6, 32, 1, "#333c57");
+  img.fill(2, 7, 28, 1, "#333c57");
+  img.fill(1, 2, 2, 2, "#ffcd75"); // bolts, so the plank reads as machinery
+  img.fill(29, 2, 2, 2, "#ffcd75");
+  return img;
+}
 
 // ---------------------------------------------------------------- finish flag (16x32, 2 frames)
 
@@ -399,19 +476,42 @@ const flagSheet = sheet([flag1, flag2]);
 
 // ---------------------------------------------------------------- background pieces
 
-// tileable hill silhouettes: integer sine frequencies over the strip width
-function hills(w, h, color, base, waves) {
-  const img = new Img(w, h);
-  for (let x = 0; x < w; x++) {
+// tileable silhouettes: integer wave frequencies over the strip width, so the ends match up.
+// `tri` swaps the sine for a triangle wave — round dunes vs jagged rock.
+function ridge(w, base, waves, tri) {
+  const wave = tri ? (t) => (2 / Math.PI) * Math.asin(Math.sin(t)) : Math.sin;
+  return Array.from({ length: w }, (_, x) => {
     let top = base;
-    for (const [amp, freq, phase] of waves) top += amp * Math.sin((x / w) * Math.PI * 2 * freq + phase);
-    img.fill(x, Math.round(top), 1, h, color);
-  }
+    for (const [amp, freq, phase] of waves) top += amp * wave((x / w) * Math.PI * 2 * freq + phase);
+    return Math.round(top);
+  });
+}
+
+function hills(w, h, color, base, waves, tri = false) {
+  const img = new Img(w, h);
+  ridge(w, base, waves, tri).forEach((top, x) => img.fill(x, top, 1, h, color));
   return img;
 }
 
+/** Same thing upside down: rock hanging from the top of the screen. */
+function ceiling(w, h, color, base, waves, tri = false) {
+  const img = new Img(w, h);
+  ridge(w, base, waves, tri).forEach((depth, x) => img.fill(x, 0, 1, depth, color));
+  return img;
+}
+
+// per location: [far colour, far base, far waves, near colour, near base, near waves, jagged?]
+const SKYLINES = {
+  meadow: [C.hillFar, 34, [[16, 2, 0.4], [7, 5, 1.9], [3, 11, 0.7]], C.hillNear, 30, [[10, 3, 2.2], [6, 7, 0.3], [2, 13, 1.1]], false],
+  desert: ["#47204a", 42, [[15, 1, 0.8], [6, 3, 2.4]], "#5b2a50", 34, [[11, 2, 1.4], [5, 5, 0.2]], false],
+  cavern: ["#1f2035", 46, [[9, 4, 0.5], [5, 9, 1.2], [3, 17, 2.0]], "#2c2b46", 36, [[8, 6, 1.7], [4, 13, 0.4], [2, 23, 1.0]], true],
+  frost: ["#202a55", 34, [[20, 2, 1.1], [7, 4, 2.6]], "#2c3a6d", 28, [[13, 3, 0.2], [6, 6, 1.5]], true],
+  magma: ["#3a1b2e", 40, [[17, 1, 1.6], [8, 3, 0.4]], "#55243a", 32, [[11, 2, 2.0], [5, 5, 1.2], [2, 9, 0.6]], false],
+};
+
 const hillsFar = hills(320, 96, C.hillFar, 34, [[16, 2, 0.4], [7, 5, 1.9], [3, 11, 0.7]]);
 const hillsNear = hills(320, 64, C.hillNear, 30, [[10, 3, 2.2], [6, 7, 0.3], [2, 13, 1.1]]);
+const caveCeiling = ceiling(320, 40, "#2c2b46", 16, [[10, 5, 0.9], [6, 11, 2.1], [3, 19, 0.3]], true);
 
 function moon(size) {
   const img = new Img(size, size);
@@ -433,6 +533,25 @@ function moon(size) {
 
 const moonImg = moon(24);
 
+/** Low desert sun: a flat disc with a brighter core and a couple of haze bands cut out. */
+function sun(size) {
+  const img = new Img(size, size);
+  const r = size / 2 - 1;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dx = x + 0.5 - size / 2;
+      const dy = y + 0.5 - size / 2;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r * r) continue;
+      img.set(x, y, hex(d2 < r * r * 0.45 ? "#ffcd75" : "#ef7d57"));
+    }
+  }
+  for (const band of [size * 0.6, size * 0.78]) img.clear(0, Math.round(band), size, 1);
+  return img;
+}
+
+const sunImg = sun(26);
+
 // ---------------------------------------------------------------- og image (1200x630)
 
 const GLYPHS = {
@@ -444,6 +563,14 @@ const GLYPHS = {
   S: [".####", "#....", "#....", ".###.", "....#", "....#", "####."],
   U: ["#...#", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
   G: [".###.", "#...#", "#....", "#.###", "#...#", "#...#", ".###."],
+  L: ["#....", "#....", "#....", "#....", "#....", "#....", "#####"],
+  E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+  W: ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
+  O: [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+  D: ["####.", "#...#", "#...#", "#...#", "#...#", "#...#", "####."],
+  1: ["..#..", ".##..", "..#..", "..#..", "..#..", "..#..", ".###."],
+  5: ["#####", "#....", "####.", "....#", "....#", "#...#", ".###."],
+  ".": [".....", ".....", ".....", "..#..", ".....", ".....", "....."],
 };
 
 function drawText(img, text, x, y, scale, color) {
@@ -500,6 +627,14 @@ function ogImage() {
   word("VS", small, C.white, (7 * big - 7 * small));
   word("BUGS", big, "#b13e53");
 
+  // subtitle: what's actually in there
+  const sub = "11 LEVELS . 5 WORLDS";
+  const subScale = 5;
+  const subX = Math.round((W - textWidth(sub, subScale)) / 2);
+  const subY = ty + 7 * big + 26;
+  drawText(img, sub, subX + 4, subY + 4, subScale, "#0d0e17");
+  drawText(img, sub, subX, subY, subScale, "#ffcd75");
+
   // actors
   img.blit(crabJump, 250, groundY - 16 * S - 60, S);
   img.blit(bugWalk1, 760, groundY - 16 * S, S);
@@ -514,11 +649,19 @@ console.log("generating assets:");
 save("sprites/crab.png", crabSheet);
 save("sprites/bug.png", bugSheet);
 save("sprites/coin.png", coinSheet);
-save("sprites/tiles.png", tileSheet);
 save("sprites/flag.png", flagSheet);
-save("sprites/hills-far.png", hillsFar);
-save("sprites/hills-near.png", hillsNear);
+save("sprites/platform.png", platformImg());
 save("sprites/moon.png", moonImg);
+save("sprites/sun.png", sunImg);
+save("sprites/cave-ceiling.png", caveCeiling);
+
+// one tile sheet and two hill strips per location
+for (const name of THEMES) {
+  const [farColor, farBase, farWaves, nearColor, nearBase, nearWaves, tri] = SKYLINES[name];
+  save(`sprites/tiles-${name}.png`, tileSheetFor(name));
+  save(`sprites/hills-far-${name}.png`, hills(320, 96, farColor, farBase, farWaves, tri));
+  save(`sprites/hills-near-${name}.png`, hills(320, 64, nearColor, nearBase, nearWaves, tri));
+}
 
 const favicon = new Img(64, 64);
 favicon.blit(crabIdle1.crop(0, 2, 16, 14), 0, 4, 4);
@@ -530,7 +673,7 @@ const previewAt = process.argv.indexOf("--preview");
 if (previewAt !== -1) {
   const dir = process.argv[previewAt + 1];
   const S = 8;
-  const rows = [crabSheet, bugSheet, coinSheet, tileSheet, flagSheet];
+  const rows = [crabSheet, bugSheet, coinSheet, flagSheet, platformImg(), ...THEMES.map(tileSheetFor)];
   const out = new Img(Math.max(...rows.map((r) => r.w)) * S, rows.reduce((sum, r) => sum + r.h + 2, 0) * S);
   out.fill(0, 0, out.w, out.h, C.sky);
   let y = 0;

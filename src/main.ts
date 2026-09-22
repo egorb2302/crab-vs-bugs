@@ -2,6 +2,7 @@ import { loadAssets } from "./assets";
 import { bindTouchControls, onPress } from "./input";
 import { k } from "./k";
 import { registerGameScene } from "./scenes/game";
+import { registerLevelsScene } from "./scenes/levels";
 import { registerStartScene } from "./scenes/start";
 import { registerWinScene } from "./scenes/win";
 import { toggleMute } from "./sfx";
@@ -11,6 +12,7 @@ bindTouchControls();
 onPress("mute", toggleMute);
 
 registerStartScene();
+registerLevelsScene();
 registerGameScene();
 registerWinScene();
 

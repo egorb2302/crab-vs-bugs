@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run levels && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "assets": "node scripts/gen-assets.mjs"
+    "assets": "node scripts/gen-assets.mjs",
+    "levels": "node scripts/check-levels.mjs"
   },
   "dependencies": {
     "@fontsource/press-start-2p": "^5.3.0",

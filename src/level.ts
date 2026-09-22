@@ -1,127 +1,11 @@
+import type { LevelDef } from "./levels";
+
 export const TILE = 16;
+export const CHUNK_W = 20; // one chunk ≈ one screen
+export const CHUNK_H = 12;
 
-// The level is a strip of 20x12 chunks (one chunk ≈ one screen), joined left to right.
-//
-//   =  ground / platform      $  coin       ^  spikes
-//   >  bug, patrols           @  player     F  finish flag
-//
-// Jump budget for must-do jumps: 2 tiles up, 3 tiles across. Anything harder should be an optional coin.
-const CHUNKS: string[][] = [
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "             $$$    ",
-    "             ===    ",
-    "  @     $$          ",
-    "====================",
-    "====================",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "        $$          ",
-    "       $  $         ",
-    "   >                ",
-    "========  ==========",
-    "========  ==========",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "          $$        ",
-    "          ==        ",
-    "    ^^    ==    >   ",
-    "====================",
-    "====================",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "         $$$        ",
-    "     $   ===   $    ",
-    "                    ",
-    "    ===       ===   ",
-    "                    ",
-    "===              ===",
-    "===              ===",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "         $ $ $      ",
-    "           >        ",
-    "       =========    ",
-    "                    ",
-    "   ==               ",
-    "          >         ",
-    "====================",
-    "====================",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "              $     ",
-    "          $  ===    ",
-    "      $  ===        ",
-    "  $  ===            ",
-    " ==                 ",
-    "    ^^^^^^^^^^^^^   ",
-    "====================",
-    "====================",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "           $        ",
-    "      $       $     ",
-    "          ===       ",
-    "     ===            ",
-    "                    ",
-    "===             ====",
-    "===             ====",
-  ],
-  [
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "                    ",
-    "    $   $   $       ",
-    "                    ",
-    "    >      >     F  ",
-    "====================",
-    "====================",
-  ],
-];
-
-const BUG_PATROL_TILES = 3; // how far a bug wanders from its spawn, if nothing stops it sooner
+/** How far a bug wanders from its spawn, if a ledge, wall or hazard doesn't stop it sooner. */
+const BUG_PATROL_TILES = 3;
 
 export interface Box {
   x: number;
@@ -135,6 +19,20 @@ export interface Point {
   y: number;
 }
 
+export interface Bug extends Point {
+  minX: number;
+  maxX: number;
+}
+
+/** A plank that shuttles along the rail drawn in the map. 2 tiles wide, 8px thick. */
+export interface Platform {
+  x: number;
+  y: number;
+  axis: "x" | "y";
+  min: number;
+  max: number;
+}
+
 export interface Level {
   cols: number;
   rows: number;
@@ -143,24 +41,33 @@ export interface Level {
   at(col: number, row: number): string;
   /** solid tiles merged into as few boxes as possible — no seams for the player to snag on */
   solids: Box[];
-  spikes: Box[];
+  /** spikes and liquid: anything that kills on touch */
+  hazards: Box[];
   /** tile centres */
   coins: Point[];
   /** bottom-centre of the tile, i.e. where feet go */
-  bugs: (Point & { minX: number; maxX: number })[];
+  bugs: Bug[];
+  platforms: Platform[];
   spawn: Point;
   flag: Point;
 }
 
+export const PLATFORM_W = 2 * TILE;
+export const PLATFORM_H = 8;
+
+const LEGEND = " =$^~><@F-|";
+
+/** Chunks are 20x12; rows may be written short and are padded with sky. */
 function joinChunks(chunks: string[][]): string[] {
-  const rows = chunks[0].length;
   chunks.forEach((chunk, i) => {
-    const width = chunk[0].length;
-    if (chunk.length !== rows || chunk.some((row) => row.length !== width)) {
-      throw new Error(`level chunk ${i} is not a clean ${width}x${rows} block`);
-    }
+    if (chunk.length !== CHUNK_H) throw new Error(`chunk ${i} has ${chunk.length} rows, expected ${CHUNK_H}`);
+    chunk.forEach((row, r) => {
+      if (row.length > CHUNK_W) throw new Error(`chunk ${i} row ${r} is ${row.length} wide, max ${CHUNK_W}: "${row}"`);
+      const bad = [...row].find((ch) => !LEGEND.includes(ch));
+      if (bad) throw new Error(`chunk ${i} row ${r}: "${bad}" is not part of the legend`);
+    });
   });
-  return Array.from({ length: rows }, (_, r) => chunks.map((chunk) => chunk[r]).join(""));
+  return Array.from({ length: CHUNK_H }, (_, r) => chunks.map((chunk) => chunk[r].padEnd(CHUNK_W)).join(""));
 }
 
 // horizontal runs of `ch`, then runs with identical extents in consecutive rows fused vertically
@@ -189,18 +96,47 @@ function mergeBoxes(map: string[], ch: string): Box[] {
   return boxes;
 }
 
-export function parseLevel(): Level {
-  const map = joinChunks(CHUNKS);
+/** Rails: a run of `-` is a horizontal track, a run of `|` a vertical one. Both need 2+ tiles. */
+function findPlatforms(map: string[]): Platform[] {
+  const out: Platform[] = [];
+  const rows = map.length;
+  const cols = map[0].length;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (map[r][c] !== "-") continue;
+      const start = c;
+      while (map[r][c + 1] === "-") c++;
+      if (c === start) throw new Error(`rail at ${start},${r} is one tile long — a platform needs 2+`);
+      out.push({ x: start * TILE, y: r * TILE, axis: "x", min: start * TILE, max: (c - 1) * TILE });
+    }
+  }
+
+  for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r++) {
+      if (map[r][c] !== "|") continue;
+      const start = r;
+      while (map[r + 1]?.[c] === "|") r++;
+      if (r === start) throw new Error(`rail at ${c},${start} is one tile long — a platform needs 2+`);
+      out.push({ x: c * TILE, y: start * TILE, axis: "y", min: start * TILE, max: r * TILE });
+    }
+  }
+
+  return out;
+}
+
+export function parseLevel(def: LevelDef): Level {
+  const map = joinChunks(def.chunks);
   const rows = map.length;
   const cols = map[0].length;
   const at = (col: number, row: number) => map[row]?.[col] ?? " ";
   const feet = (col: number, row: number): Point => ({ x: col * TILE + TILE / 2, y: (row + 1) * TILE });
 
-  // a bug may step onto a tile if it is free, not spiked, and has floor under it
-  const walkable = (col: number, row: number) => at(col, row) !== "=" && at(col, row) !== "^" && at(col, row + 1) === "=";
+  // a bug may step onto a tile if it is free, not a hazard, and has floor under it
+  const walkable = (col: number, row: number) => !"=^~".includes(at(col, row)) && at(col, row + 1) === "=";
 
   const coins: Point[] = [];
-  const bugs: Level["bugs"] = [];
+  const bugs: Bug[] = [];
   let spawn: Point | undefined;
   let flag: Point | undefined;
 
@@ -220,7 +156,7 @@ export function parseLevel(): Level {
     }
   }
 
-  if (!spawn || !flag) throw new Error("level needs both a spawn (@) and a flag (F)");
+  if (!spawn || !flag) throw new Error(`level "${def.id}" needs both a spawn (@) and a flag (F)`);
 
   return {
     cols,
@@ -229,10 +165,15 @@ export function parseLevel(): Level {
     height: rows * TILE,
     at,
     solids: mergeBoxes(map, "="),
-    // only the lower, wide part of a spike hurts — grazing a tip is forgiven
-    spikes: mergeBoxes(map, "^").map((b) => ({ x: b.x + 3, y: b.y + 9, w: b.w - 6, h: b.h - 9 })),
+    hazards: [
+      // only the lower, wide part of a spike hurts — grazing a tip is forgiven
+      ...mergeBoxes(map, "^").map((b) => ({ x: b.x + 3, y: b.y + 9, w: b.w - 6, h: b.h - 9 })),
+      // liquid: everything below the surface film
+      ...mergeBoxes(map, "~").map((b) => ({ x: b.x, y: b.y + 5, w: b.w, h: b.h - 5 })),
+    ],
     coins,
     bugs,
+    platforms: findPlatforms(map),
     spawn,
     flag,
   };

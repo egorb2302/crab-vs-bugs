@@ -2,6 +2,7 @@ import type { Anchor, Color } from "kaplay";
 import { TILE_FRAME } from "./assets";
 import { COLORS, k } from "./k";
 import { TILE } from "./level";
+import { THEMES, hillSprites, tileSprite, type ThemeName } from "./themes";
 
 // ---------------------------------------------------------------- backdrop
 
@@ -9,20 +10,23 @@ const STRIP_W = 320; // width of the tileable hill sprites
 
 const wrap = (x: number, period: number) => ((x % period) + period) % period;
 
-/** Night sky with parallax layers. `scrollX` is how far the world has scrolled, in px. */
-export function addBackdrop(scrollX: () => number) {
+/** Sky, stars and parallax layers for one location. `scrollX` is how far the world has scrolled. */
+export function addBackdrop(scrollX: () => number, name: ThemeName = "meadow") {
+  const theme = THEMES[name];
+  const [far, near] = hillSprites(name);
+
   // fixed seed: the sky should look the same on every run
   let seed = 11;
   const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
-  const stars = Array.from({ length: 46 }, () => ({
+  const stars = Array.from({ length: theme.stars }, () => ({
     x: rnd() * STRIP_W,
     y: rnd() * 120,
     size: rnd() > 0.85 ? 2 : 1,
     twinkle: rnd() * 6,
   }));
 
-  const layer = (sprite: string, y: number, factor: number) => {
-    for (let x = -wrap(scrollX() * factor, STRIP_W); x < k.width(); x += STRIP_W) {
+  const layer = (sprite: string, y: number, factor: number, scroll: number) => {
+    for (let x = -wrap(scroll * factor, STRIP_W); x < k.width(); x += STRIP_W) {
       k.drawSprite({ sprite, pos: k.vec2(Math.round(x), y) });
     }
   };
@@ -33,26 +37,32 @@ export function addBackdrop(scrollX: () => number) {
     {
       draw() {
         const scroll = scrollX();
+        const W = k.width();
+        const H = k.height();
+        k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: theme.sky });
         for (const s of stars) {
           k.drawRect({
             pos: k.vec2(Math.round(wrap(s.x - scroll * 0.03, STRIP_W)), Math.round(s.y)),
             width: s.size,
             height: s.size,
-            color: s.size > 1 ? COLORS.white : COLORS.muted,
+            color: s.size > 1 ? COLORS.white : theme.starColor,
             opacity: 0.55 + 0.45 * Math.sin(k.time() * 1.5 + s.twinkle),
           });
         }
-        const H = k.height();
-        k.drawSprite({ sprite: "moon", pos: k.vec2(Math.round(k.width() - 50 - scroll * 0.01), H - 136) });
-        layer("hills-far", H - 122, 0.12);
-        layer("hills-near", H - 82, 0.3);
+        if (theme.celestial) {
+          k.drawSprite({ sprite: theme.celestial, pos: k.vec2(Math.round(W - 50 - scroll * 0.01), H - 136) });
+        }
+        layer(far, H - 122, 0.12, scroll);
+        layer(near, H - 82, 0.3, scroll);
+        if (theme.ceiling) layer("cave-ceiling", 0, 0.2, scroll);
       },
     },
   ]);
 }
 
 /** Decorative ground along the bottom of menu screens. */
-export function addGroundStrip(topY: number) {
+export function addGroundStrip(topY: number, theme: ThemeName = "meadow") {
+  const sprite = tileSprite(theme);
   k.add([
     k.fixed(),
     k.z(-10),
@@ -60,7 +70,7 @@ export function addGroundStrip(topY: number) {
       draw() {
         for (let y = topY; y < k.height(); y += TILE) {
           for (let x = 0; x < k.width(); x += TILE) {
-            k.drawSprite({ sprite: "tiles", frame: y === topY ? TILE_FRAME.grass : TILE_FRAME.dirt, pos: k.vec2(x, y) });
+            k.drawSprite({ sprite, frame: y === topY ? TILE_FRAME.top : TILE_FRAME.body, pos: k.vec2(x, y) });
           }
         }
       },

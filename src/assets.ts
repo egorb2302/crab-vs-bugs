@@ -1,5 +1,6 @@
 import fontUrl from "@fontsource/press-start-2p/files/press-start-2p-latin-400-normal.woff2?url";
 import { k } from "./k";
+import { THEME_NAMES, hillSprites, tileSprite } from "./themes";
 
 // Sprites come from scripts/gen-assets.mjs (npm run assets) — edit the ASCII grids there.
 export function loadAssets() {
@@ -31,10 +32,16 @@ export function loadAssets() {
     sliceX: 2,
     anims: { wave: { from: 0, to: 1, speed: 3, loop: true } },
   });
-  k.loadSprite("tiles", "sprites/tiles.png", { sliceX: 3 });
-  k.loadSprite("hills-far", "sprites/hills-far.png");
-  k.loadSprite("hills-near", "sprites/hills-near.png");
+  k.loadSprite("platform", "sprites/platform.png");
   k.loadSprite("moon", "sprites/moon.png");
+  k.loadSprite("sun", "sprites/sun.png");
+  k.loadSprite("cave-ceiling", "sprites/cave-ceiling.png");
+
+  // one tile sheet and two parallax strips per location — all tiny, all loaded up front
+  for (const theme of THEME_NAMES) {
+    k.loadSprite(tileSprite(theme), `sprites/${tileSprite(theme)}.png`, { sliceX: 5 });
+    for (const sprite of hillSprites(theme)) k.loadSprite(sprite, `sprites/${sprite}.png`);
+  }
 }
 
-export const TILE_FRAME = { grass: 0, dirt: 1, spikes: 2 };
+export const TILE_FRAME = { top: 0, body: 1, spikes: 2, liquidTop: 3, liquidBody: 4 };
