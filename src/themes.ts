@@ -2,7 +2,8 @@ import type { Color } from "kaplay";
 import { k } from "./k";
 
 // A location: one tile sheet, one sky, one set of parallax strips.
-// Sprites come from scripts/gen-assets.mjs — a theme is just a name plus colours.
+// Sprites come from scripts/art.mjs — a theme is just a name plus colours.
+// The dare card (scripts/art.mjs, SKIES) keeps its own copy of the sky colours: change both.
 
 export type ThemeName = "meadow" | "desert" | "cavern" | "frost" | "magma";
 

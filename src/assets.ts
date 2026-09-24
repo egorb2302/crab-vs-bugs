@@ -3,7 +3,7 @@ import { k } from "./k";
 import { loadLight } from "./light";
 import { THEME_NAMES, hillSprites, tileSprite } from "./themes";
 
-// Sprites come from scripts/gen-assets.mjs (npm run assets) — edit the ASCII grids there.
+// Sprites come from scripts/art.mjs (npm run assets) — edit the ASCII grids there.
 export function loadAssets() {
   // Press Start 2P sits on an 8px grid: rasterise it small and let nearest-neighbour scale it up
   // like any other sprite, instead of squeezing a big atlas down into mush
