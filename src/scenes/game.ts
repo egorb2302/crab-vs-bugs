@@ -140,6 +140,7 @@ export function registerGameScene() {
     let coins = 0;
     let bugs = 0;
     let over = false;
+    let stompedAt = -1;
 
     // hud
     const coinKick = addCounterIcon("coin", 10, 8);
@@ -205,7 +206,11 @@ export function registerGameScene() {
       if (over || !bug.alive) return;
       // where the feet were a frame ago, so fast falls still register as coming from above
       const feetBefore = player.pos.y - player.vel.y * k.dt();
-      if (player.vel.y > 0 && feetBefore <= bug.pos.y - BUG_H + 4) {
+      const fromAbove = player.vel.y > 0 && feetBefore <= bug.pos.y - BUG_H + 4;
+      // two bugs stacked up: the first stomp already sent the crab upward, the second still counts
+      const sameStomp = time - stompedAt < 0.05 && player.pos.y <= bug.pos.y - BUG_H / 2;
+      if (fromAbove || sameStomp) {
+        stompedAt = time;
         squashBug(bug);
         stompBounce(player);
         bugs++;
