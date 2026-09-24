@@ -32,6 +32,8 @@ npm run dev
 
 Stack: [Kaplay](https://kaplayjs.com) + TypeScript + Vite. No other runtime dependencies; sound effects and the music are synthesised with the Web Audio API — every world has its own chiptune loop, composed from hand-written chords with a seeded melody, and lighting is one small dithered shader. `npm run levels` imports the TypeScript level data directly, so it wants Node 22.18+ (24 is what CI and Vercel use).
 
+`vite.config.ts` also patches a few bugs in Kaplay 3001.0.19 as the bundle is loaded (a physics-interpolation crash, a collision-grid hang on a runaway object, a long-delayed error screen); each patch must match exactly, so a Kaplay upgrade fails the build rather than quietly losing one. If anything still throws, the game reloads itself instead of freezing — progress is kept.
+
 ### Layout
 
 ```

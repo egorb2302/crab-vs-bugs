@@ -232,6 +232,8 @@ interface Playing {
   track: Track;
   steps: Note[][];
   bus: GainNode | null;
+  /** everything the bus feeds, so switching tunes can unplug all of it */
+  nodes: AudioNode[];
   step: number;
   /** audio-clock time of the next step; 0 = start from "now" */
   next: number;
@@ -254,6 +256,7 @@ function makeBus(ctx: AudioContext, track: Track) {
   const bus = ctx.createGain();
   bus.gain.value = 0;
   bus.connect(ctx.destination);
+  const nodes: AudioNode[] = [bus];
   if (track.echo) {
     // one feedback delay: caves and ice ring a little
     const delay = ctx.createDelay(1);
@@ -264,8 +267,10 @@ function makeBus(ctx: AudioContext, track: Track) {
     wet.gain.value = 0.35;
     bus.connect(delay).connect(feedback).connect(delay);
     delay.connect(wet).connect(ctx.destination);
+    // the delay feeds itself, so it stays plugged in until someone unplugs it by hand
+    nodes.push(delay, feedback, wet);
   }
-  return bus;
+  return { bus, nodes };
 }
 
 function tone(ctx: AudioContext, out: AudioNode, wave: OscillatorType, hz: number, t0: number, dur: number, volume: number) {
@@ -329,7 +334,8 @@ function tick() {
   const ctx = audioContext();
   const p = current;
   if (!ctx || ctx.state !== "running" || !p) return;
-  const bus = (p.bus ??= makeBus(ctx, p.track));
+  if (!p.bus) ({ bus: p.bus, nodes: p.nodes } = makeBus(ctx, p.track));
+  const bus = p.bus;
 
   const now = ctx.currentTime;
   const target = isMuted() ? 0 : now < duckUntil ? LEVEL * 0.2 : LEVEL;
@@ -360,13 +366,13 @@ const composed = new Map<ThemeName, Note[][]>();
 export function playMusic(name: ThemeName) {
   if (current?.name === name) return;
   const ctx = audioContext();
-  const old = current?.bus;
-  if (old && ctx) {
-    old.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
-    window.setTimeout(() => old.disconnect(), 1500);
+  const old = current;
+  if (old?.bus && ctx) {
+    old.bus.gain.setTargetAtTime(0, ctx.currentTime, 0.15);
+    window.setTimeout(() => old.nodes.forEach((node) => node.disconnect()), 1500);
   }
   if (!composed.has(name)) composed.set(name, compose(TRACKS[name]));
-  current = { name, track: TRACKS[name], steps: composed.get(name)!, bus: null, step: 0, next: 0, target: -1 };
+  current = { name, track: TRACKS[name], steps: composed.get(name)!, bus: null, nodes: [], step: 0, next: 0, target: -1 };
 }
 
 /** Pull the music down for a moment so a jingle can be heard. */

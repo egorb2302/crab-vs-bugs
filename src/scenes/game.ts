@@ -267,7 +267,8 @@ export function registerGameScene() {
       if (Math.abs(player.vel.x) > 30) look += (Math.sign(player.vel.x) * LOOK_AHEAD - look) * (1 - Math.exp(-dt * 2.5));
       cam += (camX(player.pos.x + look) - cam) * (1 - Math.exp(-dt * 9));
       k.setCamPos(Math.round(cam), camY);
-      if (player.pos.y > level.height + 32) die();
+      // off the bottom — or, should the physics ever blow up, off the map entirely
+      if (player.pos.y > level.height + 32 || !Number.isFinite(player.pos.x + player.pos.y)) die();
     });
 
     // quick keys: R starts the level over, Esc backs out to the level list
