@@ -13,6 +13,7 @@ A tiny browser pixel platformer starring a little orange crab: **11 levels acros
 - **Speedrun:** all 11 levels back to back on one clock (deaths and restarts keep it running) — the button is on the level list.
 - **Dares:** every result you share is a link like `/r/hop-scotch/24.3` (or `/r/all/…` for a speedrun). It unfurls into a card of its own — that level's location, your time, the level's name — and opens the game at `/?beat=hop-scotch&time=24.3`. Whoever opens it gets your time to beat on the start screen and in the HUD, and a verdict at the flag. Nothing is stored anywhere — the dare lives in the link.
 - Sharing uses the phone's own share sheet; on desktop it's a post on X or a copied link.
+- **Clips:** after the flag, **CLIP** turns the last six seconds of the run into a short video with an end card — your time, the level, the address — ready to post: MP4 where the browser can record one, WebM where it can't. While you play, those seconds are only kept as small snapshots in memory; nothing is recorded unless you press the button, and nothing leaves your device unless you share it. A browser that can't record video gets the end card as a PNG (**PIC**).
 - If your system asks for reduced motion, the game drops screen shake, parallax, weather and wipes — it plays exactly the same.
 
 ## Develop
@@ -57,7 +58,8 @@ src/
   platform.ts      plank that shuttles along a rail
   progress.ts      unlocked levels, best times, best speedrun (localStorage)
   challenge.ts     dare links: parse ?beat=…&time=…, build them for sharing
-  share.ts         share sheet on phones, X intent and copy-link on desktop
+  share.ts         share sheet on phones, X intent and copy-link on desktop, saving a clip
+  clip.ts          the run clip: a ring of snapshots while playing, replayed into a MediaRecorder
   ui.ts            parallax backdrop, labels, buttons, fades
   scenes/          start (with its little stomp loop), levels, game, win
 scripts/

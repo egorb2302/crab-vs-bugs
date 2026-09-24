@@ -34,14 +34,18 @@ export function challengeFor(target: Target): Challenge | null {
 /** Negative: beaten by that many seconds. Zero: a tie. Positive: short by that many. */
 export const versus = (time: number, against: Challenge) => (tenths(time) - tenths(against.time)) / 10;
 
+/** What a dare link is made of: "hop-scotch" and "24.3". */
+export function dareParts(target: Target, time: number) {
+  return { beat: target === "all" ? "all" : LEVELS[target].id, seconds: (tenths(time) / 10).toFixed(1) };
+}
+
 /**
  * The link a result is shared as. On the live site it is the short /r/ form, which api/dare.js
  * gives a preview card of its own and forwards to the ?beat= form. `vite dev` has no functions,
  * so there it is the ?beat= form straight away.
  */
 export function challengeUrl(target: Target, time: number): string {
-  const beat = target === "all" ? "all" : LEVELS[target].id;
-  const seconds = (tenths(time) / 10).toFixed(1);
+  const { beat, seconds } = dareParts(target, time);
   if (import.meta.env.DEV) {
     const url = new URL(location.pathname, location.origin);
     url.searchParams.set("beat", beat);

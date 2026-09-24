@@ -1,5 +1,6 @@
 import { TILE_FRAME } from "../assets";
 import { challengeFor } from "../challenge";
+import { startCapture, stopCapture } from "../clip";
 import { BUG_H, addBug, squashBug, type Bug } from "../enemy";
 import { addFx, burst, ring } from "../fx";
 import { onPress, setPlaying } from "../input";
@@ -90,7 +91,11 @@ export function registerGameScene() {
 
     setPlaying(true);
     playMusic(def.theme);
-    k.onSceneLeave(() => setPlaying(false));
+    startCapture();
+    k.onSceneLeave(() => {
+      setPlaying(false);
+      stopCapture();
+    });
     k.setGravity(GRAVITY);
     addFx();
 
@@ -212,18 +217,21 @@ export function registerGameScene() {
         deaths: args.deaths,
       };
       if (!run) {
-        k.wait(0.9, () => fadeTo("win", result));
+        k.wait(0.9, () => {
+          stopCapture(); // the clip ends on the confetti, not on the fade
+          fadeTo("win", result);
+        });
         return;
       }
       // full run: bank the level like any other clear, then straight on to the next one
       recordRun(def.id, time, coins);
       const next = index + 1;
       addLabel(`${next}/${LEVELS.length} DONE`, W / 2, k.height() / 2 - 20, { size: 8, color: COLORS.green, anchor: "center" });
-      k.wait(0.9, () =>
-        next < LEVELS.length
-          ? fadeTo("game", { level: next, deaths: args.deaths, run: carry() })
-          : fadeTo("win", { ...result, time: clock(), fullRun: true }),
-      );
+      k.wait(0.9, () => {
+        if (next < LEVELS.length) return fadeTo("game", { level: next, deaths: args.deaths, run: carry() });
+        stopCapture();
+        fadeTo("win", { ...result, time: clock(), fullRun: true });
+      });
     }
 
     player.onCollide("coin", (coin) => {

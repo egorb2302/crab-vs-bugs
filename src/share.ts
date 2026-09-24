@@ -32,3 +32,28 @@ export async function copyLink(url: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * A file (the run clip): into the share sheet where phones take files, otherwise downloaded.
+ * Resolves to false only when the player closed the share sheet.
+ */
+export async function shareFile(file: File, text: string, url: string): Promise<boolean> {
+  if (canShareNatively && navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: "Crab vs Bugs", text: `${text} ${url}` });
+      return true;
+    } catch (e) {
+      if ((e as Error).name === "AbortError") return false;
+      // some share targets turn files down: save it instead
+    }
+  }
+  const href = URL.createObjectURL(file);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = file.name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+  return true;
+}

@@ -127,7 +127,8 @@ export function addLabel(text: string | (() => string), x: number, y: number, op
 
 // ---------------------------------------------------------------- buttons
 
-export function addButton(text: string, x: number, y: number, onClick: () => void, color: Color = COLORS.orange) {
+/** `live`, if given, replaces the text as drawn; the button stays as wide as `text`. */
+export function addButton(text: string, x: number, y: number, onClick: () => void, color: Color = COLORS.orange, live?: () => string) {
   const w = text.length * 8 + 16;
   const h = 18;
   const btn = k.add([
@@ -142,7 +143,7 @@ export function addButton(text: string, x: number, y: number, onClick: () => voi
         const lift = hover ? -1 : 0;
         k.drawRect({ pos: k.vec2(-w / 2, -h / 2 + 3), width: w, height: h, color: COLORS.ink });
         k.drawRect({ pos: k.vec2(-w / 2, -h / 2 + lift), width: w, height: h, color: hover ? color.lighten(30) : color });
-        k.drawText({ text, size: 8, pos: k.vec2(0, 1 + lift), anchor: "center", color: COLORS.ink });
+        k.drawText({ text: live?.() ?? text, size: 8, pos: k.vec2(0, 1 + lift), anchor: "center", color: COLORS.ink });
       },
     },
   ]);

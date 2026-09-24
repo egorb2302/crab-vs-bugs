@@ -1,10 +1,11 @@
-import { challengeFor, challengeUrl, versus } from "../challenge";
+import { challengeFor, challengeUrl, dareParts, versus } from "../challenge";
+import { canRecord, clipName, hasClip, makeStill, makeVideo, type Card } from "../clip";
 import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { LEVELS } from "../levels";
 import { clearedCount, recordRun, recordSpeedrun } from "../progress";
 import { sfx } from "../sfx";
-import { canShareNatively, copyLink, postOnX, shareNatively } from "../share";
+import { canShareNatively, copyLink, postOnX, shareFile, shareNatively } from "../share";
 import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY } from "../ui";
 
 export interface RunResult {
@@ -19,15 +20,16 @@ export interface RunResult {
   fullRun?: boolean;
 }
 
-type Row = [label: string, action: () => void, color: ReturnType<typeof k.rgb>];
+/** `live` replaces the label as drawn; the button is sized for `label`. */
+type Row = [label: string, action: () => void, color: ReturnType<typeof k.rgb>, live?: () => string];
 
 /** One centred row of buttons. */
 function addButtonRow(buttons: Row[], cx: number, y: number) {
   const widths = buttons.map(([text]) => text.length * 8 + 16);
   const total = widths.reduce((sum, w) => sum + w, 0) + (buttons.length - 1) * 8;
   let x = cx - total / 2;
-  buttons.forEach(([text, action, color], i) => {
-    addButton(text, x + widths[i] / 2, y, action, color);
+  buttons.forEach(([text, action, color, live], i) => {
+    addButton(text, x + widths[i] / 2, y, action, color, live);
     x += widths[i] + 8;
   });
 }
@@ -118,20 +120,79 @@ export function registerWinScene() {
         ? `Beat the ${def.name} dare in Crab vs Bugs: ${time} vs ${formatTime(dare.time)}. Your move 🦀`
         : `Cleared ${def.name} in Crab vs Bugs in ${time}, ${result.coins}/${result.totalCoins} coins. Can you beat it? 🦀`;
 
-    let copiedAt = -10;
-    addLabel(() => (k.time() - copiedAt < 1.8 ? "LINK COPIED!" : ""), cx, oy + 136, { size: 6, color: COLORS.green, anchor: "top" });
+    // one line under the buttons for news: link copied, clip progress, clip saved
+    let note = "";
+    let noteAt = -10;
+    let noteHolds = false;
+    const tell = (text: string, holds = false) => {
+      note = text;
+      noteAt = k.time();
+      noteHolds = holds;
+    };
+    addLabel(() => (noteHolds || k.time() - noteAt < 2.2 ? note : ""), cx, oy + 136, { size: 6, color: COLORS.green, anchor: "top" });
     const copy = () =>
       void copyLink(url).then((ok) => {
         if (!ok) return;
-        copiedAt = k.time();
+        tell("LINK COPIED!");
         sfx.select();
       });
+
+    // the run clip: the last seconds before the flag plus an end card, made on request.
+    // A phone's share sheet needs a fresh tap, and a video takes longer to make than a tap lasts,
+    // so there it's tap to make, tap again to share; a desktop just saves it when it's done.
+    const card: Card = { heading, subtitle: full ? `ALL ${LEVELS.length} LEVELS` : `${result.level + 1}. ${def.name}`, time };
+    const { beat, seconds } = dareParts(full ? "all" : result.level, result.time);
+    const abort = new AbortController();
+    k.onSceneLeave(() => abort.abort());
+    let clip: File | null = null;
+    let making: number | null = null; // 0…1 while the clip is being made
+    const deliver = (file: File) =>
+      void shareFile(file, text, url).then((ok) => {
+        if (ok && !canShareNatively) tell(file.type === "image/png" ? "PICTURE SAVED!" : "CLIP SAVED!");
+      });
+    const onClip = () => {
+      if (making !== null) return;
+      sfx.select();
+      if (clip) return deliver(clip);
+      making = 0;
+      const tappedAt = performance.now();
+      if (canRecord) tell("MAKING THE CLIP...", true);
+      const made = canRecord
+        ? makeVideo(card, (share) => (making = share), abort.signal).catch((e) => {
+            if (abort.signal.aborted) throw e;
+            return makeStill(card); // recording fell over: the end card still makes a picture
+          })
+        : makeStill(card);
+      made.then(
+        (blob) => {
+          making = null;
+          // the bare type: share sheets match "video/mp4", not "video/mp4;codecs=avc1"
+          clip = new File([blob], clipName(beat, seconds, blob), { type: blob.type.split(";")[0] });
+          if (canShareNatively && performance.now() - tappedAt > 3000) tell("READY - TAP CLIP AGAIN", true);
+          else {
+            tell("");
+            deliver(clip);
+          }
+        },
+        () => {
+          making = null;
+          if (!abort.signal.aborted) tell("NO CLIP, SORRY", true);
+        },
+      );
+    };
+    const clipLabel = canRecord ? "CLIP" : "PIC";
+    const clipRow: Row[] = hasClip()
+      ? [[clipLabel, onClip, COLORS.white, () => (making === null ? clipLabel : `${Math.floor(making * 100)}%`)]]
+      : [];
+
     addButtonRow(
       canShareNatively
-        ? [["SHARE", () => void shareNatively(text, url), COLORS.yellow]]
+        ? [["SHARE", () => void shareNatively(text, url), COLORS.yellow], ...clipRow]
         : [
             ["POST ON X", () => postOnX(text, url), COLORS.yellow],
-            ["COPY LINK", copy, COLORS.white],
+            // a square screen has no room for the long label next to the clip
+            [W < 260 && clipRow.length ? "COPY" : "COPY LINK", copy, COLORS.white],
+            ...clipRow,
           ],
       cx,
       oy + 124,
