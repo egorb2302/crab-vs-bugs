@@ -683,6 +683,29 @@ function shadowText(img, text, x, y, scale, color) {
 const centreX = (img, width) => Math.round((img.w - width) / 2);
 
 /** @param {{ theme: keyof typeof SKIES, time: string, subtitle: string }} dare */
+// ---------------------------------------------------------------- app icon
+
+/**
+ * The home-screen icon: the crab on a strip of meadow under a starry sky, drawn on a 32×32 grid
+ * and scaled up whole. It works as a maskable icon too — the crab sits well inside the central
+ * circle that every launcher keeps, and the sky and grass run out to the edges.
+ */
+export function appIcon(size) {
+  const G = 32;
+  const s = Math.floor(size / G);
+  const off = Math.floor((size - G * s) / 2);
+  const img = new Img(size, size);
+  img.fill(0, 0, size, size, C.sky);
+  for (const [x, y, big] of [[5, 5, true], [26, 7, false], [21, 3, false], [3, 14, false], [28, 15, true]]) {
+    img.fill(off + x * s, off + y * s, s, s, big ? C.white : C.star);
+  }
+  const groundY = off + 22 * s;
+  img.fill(0, groundY, size, size - groundY, TILE_PALS.meadow.p);
+  for (let x = off - 16 * s; x < size; x += 16 * s) img.blit(tileGrass, x, groundY, s);
+  img.blit(crabIdle1.crop(0, 2, 16, 14), off + 8 * s, groundY - 13 * s, s);
+  return img;
+}
+
 export function cardImage({ theme, time, subtitle }) {
   const W = 1200;
   const H = 630;

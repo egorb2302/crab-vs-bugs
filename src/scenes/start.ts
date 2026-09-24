@@ -1,6 +1,7 @@
 import { challenge } from "../challenge";
 import { addFx, dust } from "../fx";
 import { isTouchDevice, onPress, setPlaying } from "../input";
+import { canInstall, install } from "../install";
 import { COLORS, k } from "../k";
 import { LEVELS } from "../levels";
 import { reducedMotion } from "../motion";
@@ -161,6 +162,18 @@ export function registerStartScene() {
       if (!toggleMute()) sfx.select();
     });
 
+    // shows up once the browser says the game can be installed, which may be a moment after load
+    const installer = k.add([k.pos(4, 4), k.area({ shape: new k.Rect(k.vec2(0, 0), 48, 12), cursor: "pointer" }), k.fixed()]);
+    addLabel(() => (canInstall() ? "INSTALL" : ""), 4, 4, { size: 6, color: COLORS.muted });
+    // as of the last frame: a tap on INSTALL clears the offer before the start-anywhere check sees it
+    let installShown = false;
+    k.onUpdate(() => (installShown = canInstall()));
+    installer.onClick(() => {
+      if (!canInstall()) return;
+      sfx.select();
+      install();
+    });
+
     addLabel("FAN-MADE, NON-COMMERCIAL TRIBUTE.\nNOT AFFILIATED WITH OR ENDORSED BY ANTHROPIC.", cx, k.height() - 3, {
       size: 6,
       anchor: "bot",
@@ -171,7 +184,9 @@ export function registerStartScene() {
 
     // anywhere else on the screen starts the game — phones shouldn't have to hit a small button
     k.onMousePress(() => {
-      if (!sound.isHovering() && !play.isHovering() && !list.isHovering()) start();
+      if (sound.isHovering() || play.isHovering() || list.isHovering()) return;
+      if (installShown && installer.isHovering()) return;
+      start();
     });
     const off = [onPress("jump", start), onPress("confirm", start), onPress("back", openList)];
     k.onSceneLeave(() => off.forEach((fn) => fn()));

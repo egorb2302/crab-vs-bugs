@@ -1,5 +1,5 @@
 // Writes every static image asset of the game — the drawing itself lives in scripts/art.mjs:
-//   public/sprites/*.png, public/favicon.png, public/og.png
+//   public/sprites/*.png, public/favicon.png, public/og.png, public/icons/*.png
 // Run: npm run assets            (add --preview <dir> to also dump an upscaled contact sheet)
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -10,6 +10,7 @@ import {
   Img,
   SKYLINES,
   THEMES,
+  appIcon,
   bugSheet,
   caveCeiling,
   coinSheet,
@@ -59,6 +60,9 @@ const favicon = new Img(64, 64);
 favicon.blit(crabIdle1.crop(0, 2, 16, 14), 0, 4, 4);
 save("favicon.png", favicon);
 save("og.png", ogImage());
+// home screen: Android and the manifest take 192 and 512, iOS wants 180
+for (const size of [192, 512]) save(`icons/icon-${size}.png`, appIcon(size));
+save("icons/apple-touch-icon.png", appIcon(180));
 
 // optional upscaled contact sheet for eyeballing the art
 const previewAt = process.argv.indexOf("--preview");

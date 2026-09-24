@@ -14,6 +14,7 @@ A tiny browser pixel platformer starring a little orange crab: **11 levels acros
 - **Dares:** every result you share is a link like `/r/hop-scotch/24.3` (or `/r/all/…` for a speedrun). It unfurls into a card of its own — that level's location, your time, the level's name — and opens the game at `/?beat=hop-scotch&time=24.3`. Whoever opens it gets your time to beat on the start screen and in the HUD, and a verdict at the flag. Nothing is stored anywhere — the dare lives in the link.
 - Sharing uses the phone's own share sheet; on desktop it's a post on X or a copied link.
 - **Clips:** after the flag, **CLIP** turns the last six seconds of the run into a short video with an end card — your time, the level, the address — ready to post: MP4 where the browser can record one, WebM where it can't. While you play, those seconds are only kept as small snapshots in memory; nothing is recorded unless you press the button, and nothing leaves your device unless you share it. A browser that can't record video gets the end card as a PNG (**PIC**).
+- **Install & offline:** it's a web app — **INSTALL** on the start screen (Chrome, Edge, Android) or Share → *Add to Home Screen* (iPhone, iPad) puts it on your home screen, full screen, with its own icon. Once it has been opened, the whole game (265 KB) is cached and plays without a connection; progress stays on the device as always, and dare links opened offline still bring their dare along.
 - If your system asks for reduced motion, the game drops screen shake, parallax, weather and wipes — it plays exactly the same.
 
 ## Develop
@@ -26,7 +27,7 @@ npm run dev
 | Command | What it does |
 |---|---|
 | `npm run dev` | Vite dev server on http://localhost:5173 |
-| `npm run build` | check levels + type-check + production build into `dist/` |
+| `npm run build` | check levels + type-check + production build into `dist/`, then the offline service worker |
 | `npm run preview` | serve `dist/` locally |
 | `npm run levels` | validate every map (add `--map` to print them) and refresh `api/_levels.js` |
 | `npm run assets` | regenerate every PNG in `public/` from the ASCII art in `scripts/art.mjs` |
@@ -58,13 +59,16 @@ src/
   platform.ts      plank that shuttles along a rail
   progress.ts      unlocked levels, best times, best speedrun (localStorage)
   challenge.ts     dare links: parse ?beat=…&time=…, build them for sharing
+  install.ts       the INSTALL link (beforeinstallprompt) and service worker registration
   share.ts         share sheet on phones, X intent and copy-link on desktop, saving a clip
   clip.ts          the run clip: a ring of snapshots while playing, replayed into a MediaRecorder
   ui.ts            parallax backdrop, labels, buttons, fades
   scenes/          start (with its little stomp loop), levels, game, win
 scripts/
   art.mjs          all the pixel art as ASCII grids, a tiny raster + PNG encoder, the OG and dare cards
-  gen-assets.mjs   writes public/sprites/*.png, favicon.png, og.png
+  gen-assets.mjs   writes public/sprites/*.png, icons/*.png, favicon.png, og.png
+  sw.js            the service worker, as a template: precache, network-first pages, offline dares
+  build-sw.mjs     fills it in after vite build (file list + version) and writes dist/sw.js
   check-levels.mjs map validation: shape, legend, patrols, reachability, card font
 api/
   dare.js          Vercel function behind /r/…: a page with the dare's link preview, and the card PNG
