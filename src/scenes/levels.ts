@@ -1,6 +1,7 @@
 import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { LEVELS } from "../levels";
+import { playMusic } from "../music";
 import { bestFor, clearedCount, isUnlocked } from "../progress";
 import { sfx } from "../sfx";
 import { THEMES } from "../themes";
@@ -16,6 +17,7 @@ const CARD_BG = k.rgb("#333c57");
 export function registerLevelsScene() {
   k.scene("levels", (focus: number = 0) => {
     setPlaying(false);
+    playMusic("meadow");
     const W = k.width();
     const cx = W / 2;
     const oy = menuOffsetY();

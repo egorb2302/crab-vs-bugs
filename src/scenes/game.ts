@@ -5,7 +5,9 @@ import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { TILE, parseLevel, type Box, type Level } from "../level";
 import { LEVELS } from "../levels";
+import { addLighting } from "../light";
 import { hitstop, shake } from "../motion";
+import { duckMusic, playMusic } from "../music";
 import { addPlatform } from "../platform";
 import { GRAVITY, addPlayer, stompBounce } from "../player";
 import { sfx } from "../sfx";
@@ -77,6 +79,7 @@ export function registerGameScene() {
     const theme = THEMES[def.theme];
 
     setPlaying(true);
+    playMusic(def.theme);
     k.onSceneLeave(() => setPlaying(false));
     k.setGravity(GRAVITY);
     addFx();
@@ -126,6 +129,13 @@ export function registerGameScene() {
     let cam = camX(player.pos.x);
     k.setCamPos(cam, camY);
 
+    const flagGlow = k.vec2(level.flag.x + 4, level.flag.y - 24);
+    addLighting(
+      def.theme,
+      () => (player.exists() ? player.pos.sub(0, 6) : null),
+      () => [flagGlow, ...k.get("coin").map((c) => c.pos)],
+    );
+
     let time = 0;
     let coins = 0;
     let bugs = 0;
@@ -143,6 +153,7 @@ export function registerGameScene() {
       if (over) return;
       over = true;
       sfx.death();
+      duckMusic(0.8);
       shake(5);
       burst(player.pos.sub(0, 6), CRAB_BITS, 10, 80, 500);
       player.destroy();
@@ -163,6 +174,7 @@ export function registerGameScene() {
       over = true;
       player.frozen = true;
       sfx.win();
+      duckMusic(1.4);
       const top = k.vec2(level.flag.x + 4, level.flag.y - 28);
       burst(top, CONFETTI, 24, 110, 260);
       ring(top, COLORS.yellow, 16, 0.35);

@@ -1,13 +1,109 @@
-import { COLORS, k } from "../k";
+import { addFx, dust } from "../fx";
 import { isTouchDevice, onPress, setPlaying } from "../input";
+import { COLORS, k } from "../k";
 import { LEVELS } from "../levels";
+import { reducedMotion } from "../motion";
+import { playMusic } from "../music";
 import { clearedCount, currentLevel } from "../progress";
 import { isMuted, sfx, toggleMute } from "../sfx";
+import { THEMES } from "../themes";
 import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, menuOffsetY } from "../ui";
+
+const BUG_SPEED = 30;
+const BUG_GAP = 120;
+const HOP_TIME = 0.5;
+const HOP_HEIGHT = 26;
+
+/** CRAB vs BUGS, letter by letter, riding a slow wave. */
+function addTitle(cx: number, y: number) {
+  const big = k.width() >= 320 ? 24 : 16;
+  const gap = big / 2;
+  const left = cx - (8 * big + 16 + 2 * gap) / 2;
+  const letters = [
+    ...[..."CRAB"].map((ch, i) => ({ ch, x: left + i * big, color: COLORS.orange })),
+    ...[..."BUGS"].map((ch, i) => ({ ch, x: left + 4 * big + 16 + 2 * gap + i * big, color: COLORS.red })),
+  ];
+  const shadow = Math.round(big / 8);
+  k.add([
+    k.fixed(),
+    k.z(100),
+    {
+      draw() {
+        letters.forEach(({ ch, x, color }, i) => {
+          const bob = reducedMotion ? 0 : Math.round(Math.sin(k.time() * 3 - i * 0.55) * 1.5);
+          const pos = k.vec2(x, y + bob);
+          k.drawText({ text: ch, size: big, pos: pos.add(shadow, shadow), color: COLORS.ink });
+          k.drawText({ text: ch, size: big, pos, color });
+        });
+      },
+    },
+  ]);
+  addLabel("vs", left + 4 * big + gap, y + big - 8, { color: COLORS.white });
+}
+
+/** The whole game in one loop: bugs march in from the flag, the crab hops on each one. */
+function addStompLoop(cx: number, groundY: number) {
+  const dustColor = THEMES.meadow.dust;
+  const crab = k.add([k.sprite("crab", { anim: "idle" }), k.pos(cx - 72, groundY), k.anchor("bot"), k.scale(2), k.fixed()]);
+  const bugs = [0, 1, 2].map((i) => {
+    const obj = k.add([k.sprite("bug", { anim: "walk" }), k.pos(cx + 40 + i * BUG_GAP, groundY), k.anchor("bot"), k.scale(2), k.opacity(1), k.fixed()]);
+    return { obj, alive: true, fade: 0 };
+  });
+
+  let hop = -1; // seconds into the current hop, -1 when standing
+  let target: (typeof bugs)[number] | null = null;
+  let squash = 0;
+
+  k.onUpdate(() => {
+    const dt = k.dt();
+    for (const bug of bugs) {
+      if (bug.alive) {
+        bug.obj.pos.x -= BUG_SPEED * dt;
+        // near enough that a hop lands right on it
+        if (hop < 0 && bug.obj.pos.x - crab.pos.x <= BUG_SPEED * HOP_TIME) {
+          hop = 0;
+          target = bug;
+          crab.play("jump");
+          dust(crab.pos, dustColor, 3);
+        }
+      } else if ((bug.fade += dt) > 0.4) {
+        // back of the queue, off to the right
+        const last = Math.max(...bugs.map((b) => b.obj.pos.x));
+        bug.obj.pos.x = Math.max(last, k.width()) + BUG_GAP;
+        bug.obj.opacity = 1;
+        bug.obj.play("walk");
+        bug.alive = true;
+      } else {
+        bug.obj.opacity = 1 - bug.fade / 0.4;
+      }
+    }
+
+    if (hop >= 0) {
+      hop += dt;
+      const t = Math.min(hop / HOP_TIME, 1);
+      crab.pos.y = groundY - Math.sin(t * Math.PI) * HOP_HEIGHT;
+      if (t > 0.8 && target?.alive) {
+        target.alive = false;
+        target.fade = 0;
+        target.obj.play("squash");
+      }
+      if (t >= 1) {
+        hop = -1;
+        target = null;
+        squash = 1;
+        crab.play("idle");
+        dust(crab.pos, dustColor, 4);
+      }
+    }
+    squash = Math.max(0, squash - dt * 6);
+    crab.scale = k.vec2(2 * (1 + squash * 0.25), 2 * (1 - squash * 0.2));
+  });
+}
 
 export function registerStartScene() {
   k.scene("start", () => {
     setPlaying(false);
+    playMusic("meadow");
     const W = k.width();
     const cx = W / 2;
     const oy = menuOffsetY();
@@ -17,14 +113,9 @@ export function registerStartScene() {
     k.onUpdate(() => (scroll += 14 * k.dt()));
     addBackdrop(() => scroll);
     addGroundStrip(groundY);
+    addFx();
 
-    // title: CRAB vs BUGS
-    const big = W >= 320 ? 24 : 16;
-    const gap = big / 2;
-    const left = cx - (8 * big + 16 + 2 * gap) / 2;
-    addLabel("CRAB", left, oy + 14, { size: big, color: COLORS.orange });
-    addLabel("vs", left + 4 * big + gap, oy + 14 + big - 8, { color: COLORS.white });
-    addLabel("BUGS", left + 4 * big + 16 + 2 * gap, oy + 14, { size: big, color: COLORS.red });
+    addTitle(cx, oy + 14);
 
     const cleared = clearedCount();
     addLabel(cleared > 0 ? `${cleared}/${LEVELS.length} LEVELS CLEARED` : `${LEVELS.length} LEVELS`, cx, oy + 44, {
@@ -33,13 +124,8 @@ export function registerStartScene() {
       anchor: "top",
     });
 
-    // the cast, facing off
-    const crab = k.add([k.sprite("crab", { anim: "idle" }), k.pos(cx - 72, groundY), k.anchor("bot"), k.scale(2), k.fixed()]);
-    k.add([k.sprite("bug", { anim: "walk" }), k.pos(cx + 72, groundY), k.anchor("bot"), k.scale(2), k.fixed()]);
-    k.loop(2.2, () => {
-      crab.play("jump");
-      k.tween(0, 1, 0.45, (t) => (crab.pos.y = groundY - Math.sin(t * Math.PI) * 18)).onEnd(() => crab.play("idle"));
-    });
+    k.add([k.sprite("flag", { anim: "wave" }), k.pos(W - 20, groundY), k.anchor("bot"), k.scale(2), k.fixed()]);
+    addStompLoop(cx, groundY);
 
     let starting = false;
     const start = () => {

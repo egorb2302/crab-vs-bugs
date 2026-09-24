@@ -27,7 +27,7 @@ npm run dev
 | `npm run levels` | validate every map (add `--map` to print them) |
 | `npm run assets` | regenerate every PNG in `public/` from the ASCII art in `scripts/gen-assets.mjs` |
 
-Stack: [Kaplay](https://kaplayjs.com) + TypeScript + Vite. No other runtime dependencies; sound effects are synthesised with the Web Audio API. `npm run levels` imports the TypeScript level data directly, so it wants Node 22.18+ (24 is what CI and Vercel use).
+Stack: [Kaplay](https://kaplayjs.com) + TypeScript + Vite. No other runtime dependencies; sound effects and the music are synthesised with the Web Audio API — every world has its own chiptune loop, composed from hand-written chords with a seeded melody, and lighting is one small dithered shader. `npm run levels` imports the TypeScript level data directly, so it wants Node 22.18+ (24 is what CI and Vercel use).
 
 ### Layout
 
@@ -39,6 +39,8 @@ src/
   themes.ts        the five locations: sky, stars, parallax, tile sheet
   input.ts         keyboard + touch pad → one action state
   sfx.ts           tiny synth for jump / land / coin / stomp / death / win
+  music.ts         per-world chiptune loops, scheduled on the audio clock
+  light.ts         darkness, the crab's light and glows, as a dithered shader
   fx.ts            particle pool: dust, sparkles, bug bits, confetti
   motion.ts        reduced-motion switch, screen shake, hitstop
   weather.ts       fireflies, sand, cave dust, snow and embers per location
@@ -49,7 +51,7 @@ src/
   platform.ts      plank that shuttles along a rail
   progress.ts      unlocked levels and best times (localStorage)
   ui.ts            parallax backdrop, labels, buttons, fades
-  scenes/          start, levels, game, win
+  scenes/          start (with its little stomp loop), levels, game, win
 scripts/
   gen-assets.mjs   pixel art as ASCII grids → public/sprites/*.png, favicon.png, og.png
   check-levels.mjs map validation: shape, legend, patrols, reachability

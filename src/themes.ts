@@ -19,7 +19,30 @@ export interface Theme {
   celestial: "moon" | "sun" | null;
   /** rock hanging from the top of the screen, if the location has a roof */
   ceiling: boolean;
+  light: Light;
 }
+
+/** How dark the level gets away from the crab, and any glow rising from below. */
+export interface Light {
+  /** 0..1 at the far edge of the light */
+  dark: number;
+  /** px from the crab: fully lit inside `inner`, fully dark beyond `outer` */
+  inner: number;
+  outer: number;
+  shade: Color;
+  glow: Color;
+  /** 0 = no glow from below */
+  glowAmount: number;
+}
+
+const light = (dark: number, inner: number, outer: number, glow = "#000000", glowAmount = 0): Light => ({
+  dark,
+  inner,
+  outer,
+  shade: k.rgb("#0d0e17"),
+  glow: k.rgb(glow),
+  glowAmount,
+});
 
 const rgb = (hex: string) => k.rgb(hex);
 
@@ -33,6 +56,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     starColor: rgb("#94b0c2"),
     celestial: "moon",
     ceiling: false,
+    light: light(0.3, 90, 250),
   },
   desert: {
     label: "DUNES",
@@ -43,6 +67,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     starColor: rgb("#ffcd75"),
     celestial: "sun",
     ceiling: false,
+    light: light(0.2, 110, 280, "#ef7d57", 0.1),
   },
   cavern: {
     label: "CAVERN",
@@ -53,6 +78,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     starColor: rgb("#73eff7"), // crystals, not stars
     celestial: null,
     ceiling: true,
+    light: light(0.66, 40, 135),
   },
   frost: {
     label: "GLACIER",
@@ -63,6 +89,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     starColor: rgb("#f4f4f4"),
     celestial: "moon",
     ceiling: false,
+    light: light(0.28, 90, 250),
   },
   magma: {
     label: "FOUNDRY",
@@ -73,6 +100,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     starColor: rgb("#ef7d57"), // embers
     celestial: null,
     ceiling: false,
+    light: light(0.42, 70, 200, "#ef7d57", 0.22),
   },
 };
 

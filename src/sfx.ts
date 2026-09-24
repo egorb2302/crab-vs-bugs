@@ -19,6 +19,16 @@ for (const type of ["pointerdown", "touchend", "keydown"]) {
   window.addEventListener(type, unlock, { passive: true });
 }
 
+// the game pauses in a background tab, so the music should too
+document.addEventListener("visibilitychange", () => {
+  if (!ctx) return;
+  if (document.hidden) void ctx.suspend();
+  else void ctx.resume();
+});
+
+/** The shared audio context, once a gesture has created it. */
+export const audioContext = () => ctx;
+
 function beep(from: number, to: number, duration: number, type: OscillatorType = "square", volume = 0.05, delay = 0) {
   if (muted || !ctx || ctx.state !== "running") return;
   const t0 = ctx.currentTime + delay;

@@ -1,5 +1,6 @@
 import fontUrl from "@fontsource/press-start-2p/files/press-start-2p-latin-400-normal.woff2?url";
 import { k } from "./k";
+import { loadLight } from "./light";
 import { THEME_NAMES, hillSprites, tileSprite } from "./themes";
 
 // Sprites come from scripts/gen-assets.mjs (npm run assets) — edit the ASCII grids there.
@@ -36,6 +37,7 @@ export function loadAssets() {
   k.loadSprite("moon", "sprites/moon.png");
   k.loadSprite("sun", "sprites/sun.png");
   k.loadSprite("cave-ceiling", "sprites/cave-ceiling.png");
+  loadLight();
 
   // one tile sheet and two parallax strips per location — all tiny, all loaded up front
   for (const theme of THEME_NAMES) {
