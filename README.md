@@ -10,6 +10,7 @@ A tiny browser pixel platformer starring a little orange crab: **11 levels acros
 - **Phone:** on-screen buttons — slide your thumb between ◀ ▶, tap ▲ to jump.
 - Stomp bugs from above, grab coins, reach the flag. Spikes, water, lava and bug bites send you back to the start of the level.
 - Levels unlock one by one; each one keeps your best time.
+- If your system asks for reduced motion, the game drops screen shake, parallax, weather and wipes — it plays exactly the same.
 
 ## Develop
 
@@ -37,10 +38,13 @@ src/
   assets.ts        sprite sheets and animations
   themes.ts        the five locations: sky, stars, parallax, tile sheet
   input.ts         keyboard + touch pad → one action state
-  sfx.ts           tiny synth for jump / coin / stomp / death / win
+  sfx.ts           tiny synth for jump / land / coin / stomp / death / win
+  fx.ts            particle pool: dust, sparkles, bug bits, confetti
+  motion.ts        reduced-motion switch, screen shake, hitstop
+  weather.ts       fireflies, sand, cave dust, snow and embers per location
   levels.ts        all 11 maps, as ASCII chunks
   level.ts         one map → collision boxes, hazards, coins, bugs, rails, spawn, flag
-  player.ts        movement, coyote time, jump buffer, variable jump height
+  player.ts        momentum, coyote time, jump buffer, variable jump height, squash & stretch
   enemy.ts         patrolling bug
   platform.ts      plank that shuttles along a rail
   progress.ts      unlocked levels and best times (localStorage)

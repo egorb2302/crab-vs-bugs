@@ -12,6 +12,8 @@ export interface Theme {
   sky: Color;
   /** shaded strip under floating platforms, so they read as solid */
   underside: Color;
+  /** what the crab kicks up when it lands, runs or skids */
+  dust: Color;
   stars: number;
   starColor: Color;
   celestial: "moon" | "sun" | null;
@@ -26,6 +28,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "MEADOW",
     sky: rgb("#1a1c2c"),
     underside: rgb("#392d4f"),
+    dust: rgb("#94b0c2"),
     stars: 46,
     starColor: rgb("#94b0c2"),
     celestial: "moon",
@@ -35,6 +38,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "DUNES",
     sky: rgb("#5d275d"),
     underside: rgb("#5e3a2e"),
+    dust: rgb("#ffcd75"),
     stars: 0,
     starColor: rgb("#ffcd75"),
     celestial: "sun",
@@ -44,6 +48,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "CAVERN",
     sky: rgb("#0d0e17"),
     underside: rgb("#1f2335"),
+    dust: rgb("#566c86"),
     stars: 34,
     starColor: rgb("#73eff7"), // crystals, not stars
     celestial: null,
@@ -53,6 +58,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "GLACIER",
     sky: rgb("#29366f"),
     underside: rgb("#36486a"),
+    dust: rgb("#f4f4f4"),
     stars: 40,
     starColor: rgb("#f4f4f4"),
     celestial: "moon",
@@ -62,6 +68,7 @@ export const THEMES: Record<ThemeName, Theme> = {
     label: "FOUNDRY",
     sky: rgb("#23121e"),
     underside: rgb("#241722"),
+    dust: rgb("#566c86"),
     stars: 26,
     starColor: rgb("#ef7d57"), // embers
     celestial: null,

@@ -2,7 +2,9 @@ import type { Anchor, Color } from "kaplay";
 import { TILE_FRAME } from "./assets";
 import { COLORS, k } from "./k";
 import { TILE } from "./level";
+import { reducedMotion } from "./motion";
 import { THEMES, hillSprites, tileSprite, type ThemeName } from "./themes";
+import { addWeather } from "./weather";
 
 // ---------------------------------------------------------------- backdrop
 
@@ -10,7 +12,10 @@ const STRIP_W = 320; // width of the tileable hill sprites
 
 const wrap = (x: number, period: number) => ((x % period) + period) % period;
 
-/** Sky, stars and parallax layers for one location. `scrollX` is how far the world has scrolled. */
+/**
+ * Sky, stars, parallax layers and weather for one location. `scrollX` is how far the world has
+ * scrolled. With reduced motion the backdrop holds still and the weather stays off.
+ */
 export function addBackdrop(scrollX: () => number, name: ThemeName = "meadow") {
   const theme = THEMES[name];
   const [far, near] = hillSprites(name);
@@ -36,7 +41,7 @@ export function addBackdrop(scrollX: () => number, name: ThemeName = "meadow") {
     k.z(-100),
     {
       draw() {
-        const scroll = scrollX();
+        const scroll = reducedMotion ? 0 : scrollX();
         const W = k.width();
         const H = k.height();
         k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: theme.sky });
@@ -58,6 +63,7 @@ export function addBackdrop(scrollX: () => number, name: ThemeName = "meadow") {
       },
     },
   ]);
+  addWeather(scrollX, name);
 }
 
 /** Decorative ground along the bottom of menu screens. */
@@ -145,18 +151,67 @@ export function addButton(text: string, x: number, y: number, onClick: () => voi
 
 // ---------------------------------------------------------------- transitions
 
+// Menus fade; going into a level (and every restart) is a block wipe, top-left to bottom-right:
+// the old scene is covered block by block, the new one uncovered in the same order.
+// fadeTo() remembers which one it used, so the next scene's fadeIn() plays the other half.
+
+type Transition = "fade" | "wipe";
+let incoming: Transition = "fade";
+
+const BLOCK = 12;
+const STAGGER = 0.6; // share of the wipe spent starting blocks; the rest is each block growing
+
+function addWipe(covering: boolean, duration: number, onEnd?: () => void) {
+  const cols = Math.ceil(k.width() / BLOCK);
+  const rows = Math.ceil(k.height() / BLOCK);
+  const diagonals = cols + rows - 2;
+  let t = 0;
+  const wipe = k.add([
+    k.fixed(),
+    k.z(1000),
+    {
+      update() {
+        t += k.dt() / duration;
+        if (t < 1) return;
+        wipe.destroy();
+        onEnd?.();
+      },
+      draw() {
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const grown = Math.min(Math.max((t - ((c + r) / diagonals) * STAGGER) / (1 - STAGGER), 0), 1);
+            const size = Math.round(BLOCK * (covering ? grown : 1 - grown));
+            if (size <= 0) continue;
+            const inset = (BLOCK - size) / 2;
+            k.drawRect({ pos: k.vec2(c * BLOCK + inset, r * BLOCK + inset), width: size, height: size, color: COLORS.sky });
+          }
+        }
+      },
+    },
+  ]);
+}
+
 function addCover(opacity: number) {
   return k.add([k.rect(k.width(), k.height()), k.color(COLORS.sky), k.opacity(opacity), k.fixed(), k.z(1000)]);
 }
 
 export function fadeIn(duration = 0.25) {
+  const style = incoming;
+  incoming = "fade";
+  if (style === "wipe") return addWipe(false, duration + 0.05);
   const cover = addCover(1);
   k.tween(1, 0, duration, (v) => (cover.opacity = v)).onEnd(() => cover.destroy());
 }
 
 export function fadeTo(scene: string, args?: unknown, duration = 0.25) {
+  const style: Transition = scene === "game" && !reducedMotion ? "wipe" : "fade";
+  const go = () => {
+    incoming = style;
+    k.go(scene, args);
+  };
+  if (style === "wipe") return addWipe(true, duration + 0.05, go);
   const cover = addCover(0);
-  k.tween(0, 1, duration, (v) => (cover.opacity = v)).onEnd(() => k.go(scene, args));
+  k.tween(0, 1, duration, (v) => (cover.opacity = v)).onEnd(go);
 }
 
 // ---------------------------------------------------------------- misc

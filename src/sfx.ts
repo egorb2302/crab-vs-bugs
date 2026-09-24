@@ -41,6 +41,8 @@ export const sfx = {
     beep(1319, 1319, 0.22, "square", 0.05, 0.07);
   },
   stomp: () => beep(240, 70, 0.14, "square", 0.07),
+  /** a soft thud; `impact` 0..1 is how hard the crab came down */
+  land: (impact: number) => beep(150, 55, 0.06, "triangle", 0.03 + impact * 0.05),
   death: () => beep(420, 50, 0.55, "sawtooth", 0.07),
   select: () => beep(520, 780, 0.09),
   win: () => [523, 659, 784, 1047].forEach((f, i) => beep(f, f, 0.16, "square", 0.05, i * 0.11)),

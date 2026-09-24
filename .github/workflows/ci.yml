@@ -1,0 +1,19 @@
+name: ci
+
+# Same gate as the Vercel build — level check, type-check, production build — but on every
+# push and pull request, so a broken map shows up as a red cross before anything deploys.
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build

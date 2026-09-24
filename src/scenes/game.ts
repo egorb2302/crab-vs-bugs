@@ -1,10 +1,11 @@
-import type { Vec2 } from "kaplay";
 import { TILE_FRAME } from "../assets";
 import { BUG_H, addBug, squashBug, type Bug } from "../enemy";
+import { addFx, burst, ring } from "../fx";
 import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { TILE, parseLevel, type Box, type Level } from "../level";
 import { LEVELS } from "../levels";
+import { hitstop, shake } from "../motion";
 import { addPlatform } from "../platform";
 import { GRAVITY, addPlayer, stompBounce } from "../player";
 import { sfx } from "../sfx";
@@ -54,18 +55,19 @@ function addSolid(box: Box) {
   k.add([k.pos(box.x, box.y), k.area({ shape: new k.Rect(k.vec2(0, 0), box.w, box.h) }), k.body({ isStatic: true })]);
 }
 
-function sparkle(at: Vec2) {
-  for (let i = 0; i < 6; i++) {
-    k.add([
-      k.rect(1, 1),
-      k.pos(at),
-      k.color(COLORS.yellow),
-      k.opacity(1),
-      k.move(i * 60 + k.rand(0, 40), k.rand(30, 70)),
-      k.lifespan(0.3, { fade: 0.2 }),
-      k.z(30),
-    ]);
-  }
+const BUG_BITS = [k.rgb("#b13e53"), k.rgb("#e0697c"), k.rgb("#5d275d")];
+const CRAB_BITS = [COLORS.orange, k.rgb("#eca184"), k.rgb("#a9522f")];
+const CONFETTI = [COLORS.orange, COLORS.yellow, COLORS.green, k.rgb("#73eff7"), COLORS.white];
+
+/** A HUD icon that jumps when its counter goes up. */
+function addCounterIcon(sprite: string, x: number, y: number) {
+  let kick = 0;
+  const icon = k.add([k.sprite(sprite), k.pos(x, y), k.anchor("center"), k.scale(1), k.fixed(), k.z(100)]);
+  icon.onUpdate(() => {
+    kick = Math.max(0, kick - k.dt() * 5);
+    icon.scale = k.vec2(1 + kick * 0.6);
+  });
+  return () => (kick = 1);
 }
 
 export function registerGameScene() {
@@ -77,6 +79,7 @@ export function registerGameScene() {
     setPlaying(true);
     k.onSceneLeave(() => setPlaying(false));
     k.setGravity(GRAVITY);
+    addFx();
 
     const level = parseLevel(def);
     const W = k.width();
@@ -116,8 +119,12 @@ export function registerGameScene() {
       "flag",
     ]);
 
-    const player = addPlayer(level.spawn.x, level.spawn.y);
-    k.setCamPos(camX(player.pos.x), camY);
+    const player = addPlayer(level.spawn.x, level.spawn.y, theme.dust);
+    // the camera trails the crab a little and looks ahead the way it's running
+    const LOOK_AHEAD = 22;
+    let look = 0;
+    let cam = camX(player.pos.x);
+    k.setCamPos(cam, camY);
 
     let time = 0;
     let coins = 0;
@@ -125,9 +132,9 @@ export function registerGameScene() {
     let over = false;
 
     // hud
-    k.add([k.sprite("coin"), k.pos(2, 0), k.fixed(), k.z(100)]);
+    const coinKick = addCounterIcon("coin", 10, 8);
     addLabel(() => `${coins}/${level.coins.length}`, 18, 5);
-    k.add([k.sprite("bug"), k.pos(72, -5), k.fixed(), k.z(100)]);
+    const bugKick = addCounterIcon("bug", 80, 3);
     addLabel(() => `${bugs}/${level.bugs.length}`, 91, 5);
     addLabel(() => formatTime(time), W - 4, 5, { anchor: "topright" });
     addLabel(`${index + 1}. ${def.name}`, 3, k.height() - 3, { size: 6, color: COLORS.muted, anchor: "botleft" });
@@ -136,7 +143,8 @@ export function registerGameScene() {
       if (over) return;
       over = true;
       sfx.death();
-      k.shake(5);
+      shake(5);
+      burst(player.pos.sub(0, 6), CRAB_BITS, 10, 80, 500);
       player.destroy();
       // the body gets the classic send-off: pop up, spin, drop off the screen
       const corpse = k.add([k.sprite("crab", { anim: "dead" }), k.pos(player.pos.sub(0, 8)), k.anchor("center"), k.rotate(0), k.z(20)]);
@@ -146,6 +154,7 @@ export function registerGameScene() {
         corpse.pos.y += vy * k.dt();
         corpse.angle += 540 * k.dt();
       });
+      hitstop(0.09);
       k.wait(0.85, () => fadeTo("game", { level: index, deaths: args.deaths + 1 }));
     }
 
@@ -154,6 +163,9 @@ export function registerGameScene() {
       over = true;
       player.frozen = true;
       sfx.win();
+      const top = k.vec2(level.flag.x + 4, level.flag.y - 28);
+      burst(top, CONFETTI, 24, 110, 260);
+      ring(top, COLORS.yellow, 16, 0.35);
       const result: RunResult = {
         level: index,
         time,
@@ -170,7 +182,9 @@ export function registerGameScene() {
       coin.destroy();
       coins++;
       sfx.coin();
-      sparkle(coin.pos);
+      coinKick();
+      burst(coin.pos, [COLORS.yellow, COLORS.white], 8, 60);
+      ring(coin.pos, COLORS.yellow, 9);
     });
     player.onCollide("hazard", die);
     player.onCollide("flag", win);
@@ -184,6 +198,10 @@ export function registerGameScene() {
         stompBounce(player);
         bugs++;
         sfx.stomp();
+        bugKick();
+        burst(bug.pos.sub(0, 4), BUG_BITS, 7, 70, 420);
+        shake(1.5);
+        hitstop(0.05);
       } else {
         die();
       }
@@ -191,8 +209,12 @@ export function registerGameScene() {
 
     k.onUpdate(() => {
       if (over) return;
-      time += k.dt();
-      k.setCamPos(camX(player.pos.x), camY);
+      const dt = k.dt();
+      time += dt;
+      // keep the last direction while standing still, so the view doesn't swing back and forth
+      if (Math.abs(player.vel.x) > 30) look += (Math.sign(player.vel.x) * LOOK_AHEAD - look) * (1 - Math.exp(-dt * 2.5));
+      cam += (camX(player.pos.x + look) - cam) * (1 - Math.exp(-dt * 9));
+      k.setCamPos(Math.round(cam), camY);
       if (player.pos.y > level.height + 32) die();
     });
 
@@ -201,7 +223,7 @@ export function registerGameScene() {
       onPress("restart", () => {
         if (over) return;
         over = true;
-        fadeTo("game", { level: index, deaths: args.deaths }, 0.15);
+        fadeTo("game", { level: index, deaths: args.deaths }, 0.2);
       }),
       onPress("back", () => {
         if (over) return;
