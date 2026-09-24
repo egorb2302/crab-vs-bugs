@@ -82,16 +82,20 @@ export function addPlayer(x: number, y: number, dustColor: Color) {
     if (col.displacement.x * player.vel.x < 0 && col.target.pos.y < player.pos.y - 2) player.vel.x = 0;
   });
 
-  player.onUpdate(() => {
-    const dt = k.dt();
+  // Movement runs on the physics clock (50 steps a second, whatever the monitor does), so a
+  // run-up, a slide and a short hop come out the same on a 30 Hz phone and a 240 Hz desktop.
+  let dir = 0;
+  let turning = false;
+  player.onFixedUpdate(() => {
+    const dt = k.fixedDt();
     const grounded = player.isGrounded();
     coyote = grounded ? COYOTE_TIME : coyote - dt;
     buffer -= dt;
     if (!grounded) fallSpeed = Math.max(player.vel.y, 0);
 
-    const dir = player.frozen ? 0 : Number(isDown("right")) - Number(isDown("left"));
+    dir = player.frozen ? 0 : Number(isDown("right")) - Number(isDown("left"));
     const vx = player.vel.x;
-    const turning = dir !== 0 && vx * dir < 0;
+    turning = dir !== 0 && vx * dir < 0;
     const rate = dir === 0 ? (grounded ? FRICTION : AIR_DRAG) : turning ? (grounded ? TURN : AIR_TURN) : grounded ? ACCEL : AIR_ACCEL;
     player.vel.x = approach(vx, dir * SPEED, rate * dt);
 
@@ -108,8 +112,15 @@ export function addPlayer(x: number, y: number, dustColor: Color) {
     if (player.vel.y >= 0) rising = false;
     if (rising && !isDown("jump") && player.vel.y < -JUMP_CUT) player.vel.y = -JUMP_CUT;
     if (player.vel.y > MAX_FALL) player.vel.y = MAX_FALL;
+  });
 
-    // dust: a skid when turning at speed, a small puff every few steps at a run
+  // looks only: dust, squash & stretch, animation
+  player.onUpdate(() => {
+    const dt = k.dt();
+    const grounded = player.isGrounded();
+    const vx = player.vel.x;
+
+    // a skid when turning at speed, a small puff every few steps at a run
     puff -= dt;
     if (grounded && puff <= 0) {
       if (turning && Math.abs(vx) > 60) {
@@ -129,7 +140,7 @@ export function addPlayer(x: number, y: number, dustColor: Color) {
     }
     look.scale = k.vec2(1 - spring * 0.7, 1 + spring);
 
-    const next = !grounded ? "jump" : dir !== 0 || Math.abs(player.vel.x) > 20 ? "walk" : "idle";
+    const next = !grounded ? "jump" : dir !== 0 || Math.abs(vx) > 20 ? "walk" : "idle";
     if (next !== anim) look.play((anim = next));
   });
 

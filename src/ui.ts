@@ -88,7 +88,7 @@ export function addGroundStrip(topY: number, theme: ThemeName = "meadow") {
 
 export interface LabelOpt {
   size?: number;
-  color?: Color;
+  color?: Color | (() => Color);
   anchor?: Anchor;
   align?: "left" | "center" | "right";
   width?: number;
@@ -118,7 +118,8 @@ export function addLabel(text: string | (() => string), x: number, y: number, op
           opacity: opt.opacity,
         };
         k.drawText({ ...base, pos: k.vec2(shadow, shadow), color: COLORS.ink });
-        k.drawText({ ...base, color: opt.color ?? COLORS.white });
+        const color = typeof opt.color === "function" ? opt.color() : opt.color;
+        k.drawText({ ...base, color: color ?? COLORS.white });
       },
     },
   ]);

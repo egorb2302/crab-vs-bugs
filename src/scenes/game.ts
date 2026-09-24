@@ -1,4 +1,5 @@
 import { TILE_FRAME } from "../assets";
+import { challengeFor } from "../challenge";
 import { BUG_H, addBug, squashBug, type Bug } from "../enemy";
 import { addFx, burst, ring } from "../fx";
 import { onPress, setPlaying } from "../input";
@@ -9,6 +10,7 @@ import { addLighting } from "../light";
 import { hitstop, shake } from "../motion";
 import { duckMusic, playMusic } from "../music";
 import { addPlatform } from "../platform";
+import { recordRun } from "../progress";
 import { GRAVITY, addPlayer, stompBounce } from "../player";
 import { sfx } from "../sfx";
 import { THEMES, tileSprite } from "../themes";
@@ -17,7 +19,15 @@ import type { RunResult } from "./win";
 
 export interface GameArgs {
   level: number;
+  /** in a full run: deaths across the whole run */
   deaths: number;
+  /** set while playing all levels back to back */
+  run?: FullRun;
+}
+
+export interface FullRun {
+  /** clock time carried over from the levels (and attempts) before this one */
+  elapsed: number;
 }
 
 // Tiles are drawn straight from the map, only the columns in view — no game object per tile.
@@ -141,14 +151,27 @@ export function registerGameScene() {
     let bugs = 0;
     let over = false;
     let stompedAt = -1;
+    const run = args.run ?? null;
+    const dare = challengeFor(run ? "all" : index);
+    // in a full run the clock keeps going across levels, deaths and restarts
+    const clock = () => (run?.elapsed ?? 0) + time;
+    const carry = (): FullRun | undefined => (run ? { elapsed: clock() } : undefined);
 
     // hud
     const coinKick = addCounterIcon("coin", 10, 8);
     addLabel(() => `${coins}/${level.coins.length}`, 18, 5);
     const bugKick = addCounterIcon("bug", 80, 3);
     addLabel(() => `${bugs}/${level.bugs.length}`, 91, 5);
-    addLabel(() => formatTime(time), W - 4, 5, { anchor: "topright" });
-    addLabel(`${index + 1}. ${def.name}`, 3, k.height() - 3, { size: 6, color: COLORS.muted, anchor: "botleft" });
+    addLabel(() => formatTime(clock()), W - 4, 5, { anchor: "topright" });
+    if (dare) {
+      addLabel(`VS ${formatTime(dare.time)}`, W - 4, 15, {
+        size: 6,
+        anchor: "topright",
+        color: () => (clock() > dare.time ? COLORS.red : COLORS.muted),
+      });
+    }
+    const title = run ? `RUN ${index + 1}/${LEVELS.length} - ${def.name}` : `${index + 1}. ${def.name}`;
+    addLabel(title, 3, k.height() - 3, { size: 6, color: COLORS.muted, anchor: "botleft" });
 
     function die() {
       if (over) return;
@@ -167,7 +190,7 @@ export function registerGameScene() {
         corpse.angle += 540 * k.dt();
       });
       hitstop(0.09);
-      k.wait(0.85, () => fadeTo("game", { level: index, deaths: args.deaths + 1 }));
+      k.wait(0.85, () => fadeTo("game", { level: index, deaths: args.deaths + 1, run: carry() }));
     }
 
     function win() {
@@ -188,7 +211,19 @@ export function registerGameScene() {
         totalBugs: level.bugs.length,
         deaths: args.deaths,
       };
-      k.wait(0.9, () => fadeTo("win", result));
+      if (!run) {
+        k.wait(0.9, () => fadeTo("win", result));
+        return;
+      }
+      // full run: bank the level like any other clear, then straight on to the next one
+      recordRun(def.id, time, coins);
+      const next = index + 1;
+      addLabel(`${next}/${LEVELS.length} DONE`, W / 2, k.height() / 2 - 20, { size: 8, color: COLORS.green, anchor: "center" });
+      k.wait(0.9, () =>
+        next < LEVELS.length
+          ? fadeTo("game", { level: next, deaths: args.deaths, run: carry() })
+          : fadeTo("win", { ...result, time: clock(), fullRun: true }),
+      );
     }
 
     player.onCollide("coin", (coin) => {
@@ -240,7 +275,7 @@ export function registerGameScene() {
       onPress("restart", () => {
         if (over) return;
         over = true;
-        fadeTo("game", { level: index, deaths: args.deaths }, 0.2);
+        fadeTo("game", { level: index, deaths: args.deaths, run: carry() }, 0.2);
       }),
       onPress("back", () => {
         if (over) return;

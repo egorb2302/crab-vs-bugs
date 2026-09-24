@@ -2,7 +2,7 @@ import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { LEVELS } from "../levels";
 import { playMusic } from "../music";
-import { bestFor, clearedCount, isUnlocked } from "../progress";
+import { bestFor, bestSpeedrun, clearedCount, isUnlocked } from "../progress";
 import { sfx } from "../sfx";
 import { THEMES } from "../themes";
 import { addBackdrop, addButton, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY } from "../ui";
@@ -26,14 +26,17 @@ export function registerLevelsScene() {
     k.onUpdate(() => (scroll += 10 * k.dt()));
     addBackdrop(() => scroll);
 
-    addLabel("PICK A LEVEL", cx, oy + 6, { size: 10, anchor: "top" });
-    addLabel(`${clearedCount()}/${LEVELS.length} CLEARED`, cx, oy + 20, { size: 6, color: COLORS.muted, anchor: "top" });
-
     const cols = W >= 300 ? 4 : 3;
     const rows = Math.ceil(LEVELS.length / cols);
     const gridW = cols * CARD_W + (cols - 1) * GAP;
     const left = Math.round(cx - gridW / 2);
-    const top = oy + 32;
+    // portrait stacks the grid one row deeper: pull everything up so the buttons stay on screen
+    const top = Math.min(oy + 32, k.height() - rows * (CARD_H + GAP) - 36);
+
+    addLabel("PICK A LEVEL", cx, top - 26, { size: 10, anchor: "top" });
+    const bestRun = bestSpeedrun();
+    const summary = `${clearedCount()}/${LEVELS.length} CLEARED` + (bestRun === null ? "" : `   BEST SPEEDRUN ${formatTime(bestRun)}`);
+    addLabel(summary, cx, top - 12, { size: 6, color: COLORS.muted, anchor: "top" });
 
     let selected = Math.min(Math.max(focus, 0), LEVELS.length - 1);
     let leaving = false;
@@ -94,12 +97,25 @@ export function registerLevelsScene() {
 
     // the selected level's name sits under the grid, where there's room to spell it out
     addLabel(() => LEVELS[selected].name, cx, top + rows * (CARD_H + GAP) + 2, { size: 8, anchor: "top" });
-    addButton("BACK", cx, top + rows * (CARD_H + GAP) + 22, () => {
+    // all levels back to back on one clock; open to everyone, locks or not — it starts at level 1
+    const speedrun = () => {
+      if (leaving) return;
+      leaving = true;
+      sfx.select();
+      fadeTo("game", { level: 0, deaths: 0, run: { elapsed: 0 } });
+    };
+    const back = () => {
       if (leaving) return;
       leaving = true;
       sfx.select();
       fadeTo("start");
-    }, COLORS.white);
+    };
+    const backW = 4 * 8 + 16;
+    const runW = 8 * 8 + 16;
+    const buttonsY = top + rows * (CARD_H + GAP) + 22;
+    const rowLeft = cx - (backW + 8 + runW) / 2;
+    addButton("BACK", rowLeft + backW / 2, buttonsY, back, COLORS.white);
+    addButton("SPEEDRUN", rowLeft + backW + 8 + runW / 2, buttonsY, speedrun, COLORS.yellow);
 
     const step = (by: number) => {
       selected = (selected + by + LEVELS.length) % LEVELS.length;

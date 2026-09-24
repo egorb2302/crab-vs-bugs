@@ -1,3 +1,4 @@
+import { challenge } from "../challenge";
 import { addFx, dust } from "../fx";
 import { isTouchDevice, onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
@@ -7,7 +8,7 @@ import { playMusic } from "../music";
 import { clearedCount, currentLevel } from "../progress";
 import { isMuted, sfx, toggleMute } from "../sfx";
 import { THEMES } from "../themes";
-import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, menuOffsetY } from "../ui";
+import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY } from "../ui";
 
 const BUG_SPEED = 30;
 const BUG_GAP = 120;
@@ -118,11 +119,14 @@ export function registerStartScene() {
     addTitle(cx, oy + 14);
 
     const cleared = clearedCount();
-    addLabel(cleared > 0 ? `${cleared}/${LEVELS.length} LEVELS CLEARED` : `${LEVELS.length} LEVELS`, cx, oy + 44, {
-      size: 6,
-      color: COLORS.muted,
-      anchor: "top",
-    });
+    // opened from someone's shared result: their time is the dare, and PLAY takes it up
+    const dare = challenge;
+    const subtitle = dare
+      ? `DARE: ${dare.target === "all" ? `ALL ${LEVELS.length} LEVELS` : LEVELS[dare.target].name} IN ${formatTime(dare.time)}`
+      : cleared > 0
+        ? `${cleared}/${LEVELS.length} LEVELS CLEARED`
+        : `${LEVELS.length} LEVELS`;
+    addLabel(subtitle, cx, oy + 44, { size: 6, color: dare ? COLORS.yellow : COLORS.muted, anchor: "top" });
 
     k.add([k.sprite("flag", { anim: "wave" }), k.pos(W - 20, groundY), k.anchor("bot"), k.scale(2), k.fixed()]);
     addStompLoop(cx, groundY);
@@ -132,7 +136,8 @@ export function registerStartScene() {
       if (starting) return;
       starting = true;
       sfx.select();
-      fadeTo("game", { level: currentLevel(), deaths: 0 });
+      if (dare?.target === "all") fadeTo("game", { level: 0, deaths: 0, run: { elapsed: 0 } });
+      else fadeTo("game", { level: dare ? dare.target : currentLevel(), deaths: 0 });
     };
     const openList = () => {
       if (starting) return;
@@ -141,7 +146,7 @@ export function registerStartScene() {
       fadeTo("levels", currentLevel());
     };
 
-    const playText = cleared > 0 ? "CONTINUE" : "PLAY";
+    const playText = dare ? "ACCEPT" : cleared > 0 ? "CONTINUE" : "PLAY";
     const playW = playText.length * 8 + 16;
     const listW = 6 * 8 + 16;
     const total = playW + 10 + listW;

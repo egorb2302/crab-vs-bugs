@@ -37,8 +37,9 @@ export function bestFor(id: string): Best | null {
 
 export const isCleared = (id: string) => bestFor(id) !== null;
 
-/** Levels open one after another; the first one is always open. */
-export const isUnlocked = (index: number) => index === 0 || isCleared(LEVELS[index - 1]?.id ?? "");
+/** Levels open one after another; the first one is always open, and so is one beaten on a dare. */
+export const isUnlocked = (index: number) =>
+  index === 0 || isCleared(LEVELS[index - 1]?.id ?? "") || isCleared(LEVELS[index]?.id ?? "");
 
 /** The level the CONTINUE button should drop you into: the first one not cleared yet. */
 export function currentLevel(): number {
@@ -54,5 +55,31 @@ export function recordRun(id: string, time: number, coins: number): Best | null 
   const previous = bestFor(id);
   data[id] = [previous ? Math.min(previous.time, time) : time, Math.max(previous?.coins ?? 0, coins)];
   write(data);
+  return previous;
+}
+
+// ---------------------------------------------------------------- full run
+
+const RUN_KEY = "crab-vs-bugs:speedrun";
+
+export function bestSpeedrun(): number | null {
+  try {
+    const time = Number(localStorage.getItem(RUN_KEY));
+    return time > 0 ? time : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Saves an all-levels time if it's a new best; returns the best from before. */
+export function recordSpeedrun(time: number): number | null {
+  const previous = bestSpeedrun();
+  if (previous === null || time < previous) {
+    try {
+      localStorage.setItem(RUN_KEY, String(time));
+    } catch {
+      // not remembered, same as levels
+    }
+  }
   return previous;
 }

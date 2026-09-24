@@ -10,6 +10,9 @@ A tiny browser pixel platformer starring a little orange crab: **11 levels acros
 - **Phone:** on-screen buttons — slide your thumb between ◀ ▶, tap ▲ to jump.
 - Stomp bugs from above, grab coins, reach the flag. Spikes, water, lava and bug bites send you back to the start of the level.
 - Levels unlock one by one; each one keeps your best time.
+- **Speedrun:** all 11 levels back to back on one clock (deaths and restarts keep it running) — the button is on the level list.
+- **Dares:** every result you share is a link like `/?beat=hop-scotch&time=24.3` (or `?beat=all` for a speedrun). Whoever opens it gets your time to beat on the start screen and in the HUD, and a verdict at the flag. Nothing is sent anywhere — the dare lives in the link.
+- Sharing uses the phone's own share sheet; on desktop it's a post on X or a copied link.
 - If your system asks for reduced motion, the game drops screen shake, parallax, weather and wipes — it plays exactly the same.
 
 ## Develop
@@ -46,10 +49,13 @@ src/
   weather.ts       fireflies, sand, cave dust, snow and embers per location
   levels.ts        all 11 maps, as ASCII chunks
   level.ts         one map → collision boxes, hazards, coins, bugs, rails, spawn, flag
-  player.ts        momentum, coyote time, jump buffer, variable jump height, squash & stretch
+  player.ts        momentum, coyote time, jump buffer, variable jump height, squash & stretch —
+                   movement runs on the fixed 50 Hz physics step, so it feels the same at any refresh rate
   enemy.ts         patrolling bug
   platform.ts      plank that shuttles along a rail
-  progress.ts      unlocked levels and best times (localStorage)
+  progress.ts      unlocked levels, best times, best speedrun (localStorage)
+  challenge.ts     dare links: parse ?beat=…&time=…, build them for sharing
+  share.ts         share sheet on phones, X intent and copy-link on desktop
   ui.ts            parallax backdrop, labels, buttons, fades
   scenes/          start (with its little stomp loop), levels, game, win
 scripts/
