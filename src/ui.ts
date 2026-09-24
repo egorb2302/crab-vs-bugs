@@ -218,6 +218,11 @@ export function fadeTo(scene: string, args?: unknown, duration = 0.25) {
 
 // ---------------------------------------------------------------- misc
 
+/** Over to the level editor (a page of its own), with this level in it if there's a code. */
+export function openEditor(code?: string) {
+  location.href = code ? `editor.html#edit=${code}` : "editor.html";
+}
+
 /** 83.42 → "1:23.4" */
 export function formatTime(seconds: number): string {
   const tenths = Math.floor(seconds * 10);

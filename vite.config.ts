@@ -69,6 +69,8 @@ export default defineConfig({
       transformIndexHtml: (html) => html.replaceAll("__SITE_URL__", siteUrl),
     },
   ],
+  // two pages: the game, and the level editor (which doesn't load the engine at all)
+  build: { rolldownOptions: { input: { main: "index.html", editor: "editor.html" } } },
   // pre-bundled dependencies skip plugin transforms, and the fixes above must apply in dev too
   optimizeDeps: { exclude: ["kaplay"] },
 });

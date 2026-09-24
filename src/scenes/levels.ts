@@ -5,7 +5,7 @@ import { playMusic } from "../music";
 import { bestFor, bestSpeedrun, clearedCount, isUnlocked } from "../progress";
 import { sfx } from "../sfx";
 import { THEMES } from "../themes";
-import { addBackdrop, addButton, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY } from "../ui";
+import { addBackdrop, addButton, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY, openEditor } from "../ui";
 
 const CARD_W = 56;
 const CARD_H = 30;
@@ -110,12 +110,21 @@ export function registerLevelsScene() {
       sfx.select();
       fadeTo("start");
     };
+    // make your own: the editor is a page of its own
+    const editor = () => {
+      if (leaving) return;
+      leaving = true;
+      sfx.select();
+      openEditor();
+    };
     const backW = 4 * 8 + 16;
     const runW = 8 * 8 + 16;
+    const editW = 6 * 8 + 16;
     const buttonsY = top + rows * (CARD_H + GAP) + 22;
-    const rowLeft = cx - (backW + 8 + runW) / 2;
+    const rowLeft = cx - (backW + runW + editW + 16) / 2;
     addButton("BACK", rowLeft + backW / 2, buttonsY, back, COLORS.white);
     addButton("SPEEDRUN", rowLeft + backW + 8 + runW / 2, buttonsY, speedrun, COLORS.yellow);
+    addButton("EDITOR", rowLeft + backW + runW + 16 + editW / 2, buttonsY, editor, COLORS.white);
 
     const step = (by: number) => {
       selected = (selected + by + LEVELS.length) % LEVELS.length;

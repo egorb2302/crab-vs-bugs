@@ -3,7 +3,8 @@ import { k } from "./k";
 
 // A location: one tile sheet, one sky, one set of parallax strips.
 // Sprites come from scripts/art.mjs — a theme is just a name plus colours.
-// The dare card (scripts/art.mjs, SKIES) keeps its own copy of the sky colours: change both.
+// The dare card (scripts/art.mjs, SKIES) and the level editor (src/editor/editor.ts, LOOK) keep their
+// own copies of the colours: change them there too.
 
 export type ThemeName = "meadow" | "desert" | "cavern" | "frost" | "magma";
 

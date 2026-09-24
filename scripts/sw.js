@@ -42,7 +42,8 @@ async function openPage(request) {
   const dare = path.match(/^r\/([^/]+)\/([^/]+)\/?$/);
   const offline = async () => {
     if (dare) return Response.redirect(new URL(`./?beat=${dare[1]}&time=${dare[2]}`, scope).href, 302);
-    return caches.match(page, { ignoreVary: true });
+    // the page itself if it's one of ours (editor.html), otherwise the game
+    return (await caches.match(request, { ignoreSearch: true, ignoreVary: true })) ?? caches.match(page, { ignoreVary: true });
   };
   const network = fetch(request);
   const slow = new Promise((resolve) => setTimeout(resolve, SLOW_NETWORK_MS, null));

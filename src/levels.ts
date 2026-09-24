@@ -9,7 +9,8 @@ import type { ThemeName } from "./themes";
 //
 // Jump budget: a full jump clears 3 tiles up or 4 tiles across, but not both. Must-do jumps
 // stay at 2 up / 3 across; anything tighter belongs to an optional coin.
-// `npm run levels` re-checks every map: widths, legend, patrol ranges, reachability.
+// `npm run levels` re-checks every map: widths, legend, patrol ranges, reachability (src/validate.ts).
+// editor.html draws maps with the mouse and copies them out in this exact format.
 
 export interface LevelDef {
   /** stable key for saved progress — never reuse or rename */

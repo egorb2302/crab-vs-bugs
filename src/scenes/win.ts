@@ -6,7 +6,8 @@ import { LEVELS } from "../levels";
 import { clearedCount, recordRun, recordSpeedrun } from "../progress";
 import { sfx } from "../sfx";
 import { canShareNatively, copyLink, postOnX, shareFile, shareNatively } from "../share";
-import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY } from "../ui";
+import { addBackdrop, addButton, addGroundStrip, addLabel, fadeIn, fadeTo, formatTime, menuOffsetY, openEditor } from "../ui";
+import type { CustomLevel } from "./game";
 
 export interface RunResult {
   level: number;
@@ -18,6 +19,8 @@ export interface RunResult {
   deaths: number;
   /** all levels back to back: `time` and `deaths` are for the whole run, the rest is the last level */
   fullRun?: boolean;
+  /** a level from the editor or a shared link: nothing is saved, and the link is the level's own */
+  custom?: CustomLevel;
 }
 
 /** `live` replaces the label as drawn; the button is sized for `label`. */
@@ -41,15 +44,16 @@ export function registerWinScene() {
     const cx = W / 2;
     const oy = menuOffsetY();
     const groundY = oy + 148;
-    const def = LEVELS[result.level];
+    const custom = result.custom;
+    const def = custom?.def ?? LEVELS[result.level];
     const full = result.fullRun === true;
-    const next = !full && result.level + 1 < LEVELS.length ? result.level + 1 : null;
+    const next = !full && !custom && result.level + 1 < LEVELS.length ? result.level + 1 : null;
     const time = formatTime(result.time);
 
     // full-run levels were banked one by one as they were cleared
-    const previousBest = full ? recordSpeedrun(result.time) : (recordRun(def.id, result.time, result.coins)?.time ?? null);
-    const allDone = clearedCount() === LEVELS.length;
-    const dare = challengeFor(full ? "all" : result.level);
+    const previousBest = custom ? null : full ? recordSpeedrun(result.time) : (recordRun(def.id, result.time, result.coins)?.time ?? null);
+    const allDone = !custom && clearedCount() === LEVELS.length;
+    const dare = custom ? null : challengeFor(full ? "all" : result.level);
 
     let scroll = 0;
     k.onUpdate(() => (scroll += 14 * k.dt()));
@@ -58,7 +62,8 @@ export function registerWinScene() {
 
     const heading = full ? "SPEEDRUN!" : allDone ? "ALL CLEAR!" : "LEVEL CLEAR!";
     addLabel(heading, cx, oy + 4, { size: 16, color: COLORS.green, anchor: "top" });
-    addLabel(full ? `ALL ${LEVELS.length} LEVELS` : `${result.level + 1}. ${def.name}`, cx, oy + 24, {
+    const subtitle = full ? `ALL ${LEVELS.length} LEVELS` : custom ? def.name : `${result.level + 1}. ${def.name}`;
+    addLabel(subtitle, cx, oy + 24, {
       size: 8,
       color: COLORS.muted,
       anchor: "top",
@@ -83,7 +88,9 @@ export function registerWinScene() {
 
     // one line of verdict: the dare if there is one, otherwise the personal best
     const gap = dare ? versus(result.time, dare) : 0;
-    const [verdict, verdictColor] = dare
+    const [verdict, verdictColor] = custom
+      ? ["A HOMEMADE LEVEL", COLORS.muted]
+      : dare
       ? gap < 0
         ? [`YOU BEAT ${formatTime(dare.time)} BY ${(-gap).toFixed(1)}S!`, COLORS.green]
         : gap === 0
@@ -101,20 +108,37 @@ export function registerWinScene() {
       sfx.select();
       fadeTo(scene, args);
     };
-    const replay = full ? go("game", { level: 0, deaths: 0, run: { elapsed: 0 } }) : go("game", { level: result.level, deaths: 0 });
-    const toLevels = go("levels", result.level);
-    const onward = next === null ? toLevels : go("game", { level: next, deaths: 0 });
+    const replay = full
+      ? go("game", { level: 0, deaths: 0, run: { elapsed: 0 } })
+      : go("game", { level: result.level, deaths: 0, custom });
+    const toLevels = custom ? go("start", custom) : go("levels", result.level);
+    const onward = custom ? replay : next === null ? toLevels : go("game", { level: next, deaths: 0 });
+    const edit = () => {
+      if (leaving || !custom) return;
+      leaving = true;
+      sfx.select();
+      openEditor(custom.code);
+    };
 
-    const buttons: Row[] = [
-      [next === null ? "LEVELS" : "NEXT", onward, COLORS.orange],
-      [full ? "AGAIN" : "RETRY", replay, COLORS.white],
-    ];
+    const buttons: Row[] = custom
+      ? [
+          ["RETRY", replay, COLORS.orange],
+          ["EDIT", edit, COLORS.white],
+          ["MENU", toLevels, COLORS.white],
+        ]
+      : [
+          [next === null ? "LEVELS" : "NEXT", onward, COLORS.orange],
+          [full ? "AGAIN" : "RETRY", replay, COLORS.white],
+        ];
     if (next !== null) buttons.push(["LEVELS", toLevels, COLORS.white]);
     addButtonRow(buttons, cx, oy + 102);
 
     // every shared result is a dare of its own: the link opens the same level with this time to beat
-    const url = challengeUrl(full ? "all" : result.level, result.time);
-    const text = full
+    // a homemade level is shared as itself: the whole map rides in the link
+    const url = custom ? `${location.origin}${location.pathname}#play=${custom.code}` : challengeUrl(full ? "all" : result.level, result.time);
+    const text = custom
+      ? `Cleared ${def.name}, a homemade Crab vs Bugs level, in ${time}. Your turn 🦀`
+      : full
       ? `All ${LEVELS.length} levels of Crab vs Bugs in ${time} (${result.deaths} deaths). Can you go faster? 🦀`
       : dare && gap < 0
         ? `Beat the ${def.name} dare in Crab vs Bugs: ${time} vs ${formatTime(dare.time)}. Your move 🦀`
@@ -140,8 +164,8 @@ export function registerWinScene() {
     // the run clip: the last seconds before the flag plus an end card, made on request.
     // A phone's share sheet needs a fresh tap, and a video takes longer to make than a tap lasts,
     // so there it's tap to make, tap again to share; a desktop just saves it when it's done.
-    const card: Card = { heading, subtitle: full ? `ALL ${LEVELS.length} LEVELS` : `${result.level + 1}. ${def.name}`, time };
-    const { beat, seconds } = dareParts(full ? "all" : result.level, result.time);
+    const card: Card = { heading, subtitle, time };
+    const { beat, seconds } = custom ? { beat: "custom", seconds: result.time.toFixed(1) } : dareParts(full ? "all" : result.level, result.time);
     const abort = new AbortController();
     k.onSceneLeave(() => abort.abort());
     let clip: File | null = null;

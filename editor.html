@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Level editor — Crab vs Bugs</title>
+    <meta name="description" content="Draw your own Crab vs Bugs level, check that it can be beaten, play it, and share it as a link." />
+    <meta name="theme-color" content="#1a1c2c" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <style>
+      :root {
+        --sky: #1a1c2c;
+        --ink: #0d0e17;
+        --panel: #262b44;
+        --line: #333c57;
+        --white: #f4f4f4;
+        --muted: #94b0c2;
+        --orange: #d97757;
+        --red: #e0697c;
+        --yellow: #ffcd75;
+        --green: #a7f070;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: var(--sky);
+        color: var(--white);
+        font: 10px/1.6 "Press Start 2P", monospace;
+      }
+
+      body {
+        padding: 12px max(16px, env(safe-area-inset-right)) 32px max(16px, env(safe-area-inset-left));
+      }
+
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px 16px;
+        margin-bottom: 12px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: normal;
+      }
+
+      h1 .crab {
+        color: var(--orange);
+      }
+
+      h1 .bugs {
+        color: #b13e53;
+      }
+
+      a {
+        color: var(--muted);
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+
+      label {
+        color: var(--muted);
+      }
+
+      input,
+      select,
+      button {
+        font: inherit;
+        color: var(--white);
+        background: var(--panel);
+        border: 2px solid var(--line);
+        border-radius: 0;
+        padding: 6px 8px;
+        min-height: 34px;
+      }
+
+      input {
+        width: 17ch;
+        text-transform: uppercase;
+      }
+
+      button {
+        cursor: pointer;
+        box-shadow: 0 3px 0 var(--ink);
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--muted);
+      }
+
+      button:active:not(:disabled) {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 var(--ink);
+      }
+
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+
+      button.primary {
+        background: var(--orange);
+        border-color: var(--orange);
+        color: var(--ink);
+      }
+
+      button.share {
+        background: var(--yellow);
+        border-color: var(--yellow);
+        color: var(--ink);
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--yellow);
+        outline-offset: 2px;
+      }
+
+      #palette {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      #palette button {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 8px 4px 4px;
+      }
+
+      #palette button[aria-pressed="true"] {
+        border-color: var(--orange);
+        background: #3c4361;
+      }
+
+      #palette canvas {
+        width: 24px;
+        height: 24px;
+        image-rendering: pixelated;
+      }
+
+      .spacer {
+        flex: 1;
+      }
+
+      #stage {
+        overflow-x: auto;
+        overflow-y: hidden;
+        border: 2px solid var(--line);
+        background: var(--ink);
+        margin-bottom: 10px;
+        scrollbar-color: var(--line) var(--ink);
+      }
+
+      #map {
+        display: block;
+        height: min(calc(100vh - 330px), 384px);
+        min-height: 192px;
+        image-rendering: pixelated;
+        cursor: crosshair;
+        touch-action: pan-x;
+      }
+
+      #status {
+        min-height: 1.6em;
+        color: var(--green);
+      }
+
+      #status.bad {
+        color: var(--red);
+      }
+
+      #report {
+        display: grid;
+        gap: 6px;
+        margin: 0 0 16px;
+        padding: 0;
+        list-style: none;
+      }
+
+      #report li {
+        padding: 6px 8px;
+        border-left: 4px solid var(--line);
+        background: var(--panel);
+      }
+
+      #report li.error {
+        border-color: var(--red);
+      }
+
+      #report li.warn {
+        border-color: var(--yellow);
+      }
+
+      #report li.ok {
+        border-color: var(--green);
+      }
+
+      #report li[data-at] {
+        cursor: pointer;
+      }
+
+      #stats {
+        color: var(--muted);
+      }
+
+      details {
+        max-width: 72ch;
+        color: var(--muted);
+      }
+
+      summary {
+        cursor: pointer;
+        color: var(--white);
+      }
+
+      kbd {
+        color: var(--white);
+      }
+
+      footer {
+        margin-top: 20px;
+        color: var(--muted);
+        font-size: 8px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1><span class="crab">CRAB</span> vs <span class="bugs">BUGS</span> · LEVEL EDITOR</h1>
+      <a href="./">BACK TO THE GAME</a>
+    </header>
+
+    <div class="row">
+      <label for="name">NAME</label>
+      <input id="name" maxlength="16" autocomplete="off" spellcheck="false" />
+      <label for="theme">PLACE</label>
+      <select id="theme"></select>
+      <label for="template">START FROM</label>
+      <select id="template"></select>
+    </div>
+
+    <div class="row">
+      <div id="palette" role="toolbar" aria-label="Tiles"></div>
+      <span class="spacer"></span>
+      <button id="undo" title="Undo (Ctrl+Z)">UNDO</button>
+      <button id="add" title="Add a screen at the end">+ SCREEN</button>
+      <button id="remove" title="Remove the last screen">- SCREEN</button>
+      <button id="reach" aria-pressed="true" title="Tint every tile the crab can stand on">REACH</button>
+    </div>
+
+    <div id="stage"><canvas id="map" aria-label="The level map: click or drag to paint tiles"></canvas></div>
+
+    <div class="row">
+      <button id="play" class="primary">PLAY</button>
+      <button id="share" class="share">SHARE LINK</button>
+      <button id="export" title="Copy the level as code for src/levels.ts">COPY FOR levels.ts</button>
+      <span id="status" role="status"></span>
+    </div>
+
+    <p id="stats"></p>
+    <ul id="report" aria-live="polite"></ul>
+
+    <details>
+      <summary>HOW IT WORKS</summary>
+      <p>
+        Pick a tile and paint it on the map; right-click (or the sky tile) erases. <kbd>Ctrl+Z</kbd> undoes. One screen is 20×12
+        tiles; a level is a few screens joined left to right.
+      </p>
+      <p>
+        The crab clears 3 tiles up or 4 across in one jump, never both. The check below treats anything past 2 up / 3 across as
+        unreachable, so a level it passes can be beaten. The green tint shows every tile the crab can stand on.
+      </p>
+      <p>
+        Bugs walk up to 3 tiles each way and turn at ledges, walls and hazards. A rail makes a 2-tile plank shuttle along it:
+        draw <kbd>-</kbd> across or <kbd>|</kbd> down, at least 2 tiles long.
+      </p>
+      <p>
+        PLAY tests the level right away. SHARE LINK needs a level with no errors: the whole map rides inside the link, so
+        nothing is uploaded and there is no account. Your draft stays in this browser.
+      </p>
+    </details>
+
+    <footer>FAN-MADE, NON-COMMERCIAL TRIBUTE. NOT AFFILIATED WITH OR ENDORSED BY ANTHROPIC.</footer>
+
+    <script type="module" src="/src/editor/editor.ts"></script>
+  </body>
+</html>

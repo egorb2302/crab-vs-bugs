@@ -2,6 +2,9 @@ import { loadAssets } from "./assets";
 import { bindTouchControls, onPress } from "./input";
 import { registerOffline } from "./install";
 import { k } from "./k";
+import { parseLevel } from "./level";
+import { decodeLevel, levelFromHash } from "./levelcode";
+import type { CustomLevel } from "./scenes/game";
 import { registerGameScene } from "./scenes/game";
 import { registerLevelsScene } from "./scenes/levels";
 import { registerStartScene } from "./scenes/start";
@@ -18,7 +21,28 @@ registerLevelsScene();
 registerGameScene();
 registerWinScene();
 
-k.onLoad(() => k.go("start"));
+// A homemade level rides in the link (#play=… shared, #test=… from the editor's PLAY button).
+// One that doesn't decode, or that the game couldn't build, just opens the game as usual.
+async function customFromLink(): Promise<CustomLevel | null> {
+  const link = levelFromHash();
+  const def = link && (await decodeLevel(link.code));
+  if (!link || !def) return null;
+  try {
+    parseLevel(def);
+  } catch {
+    return null;
+  }
+  return { def, code: link.code, test: link.test };
+}
+const custom = customFromLink();
+
+k.onLoad(() =>
+  void custom.then((level) => {
+    // straight from the editor: no title screen in between, it's a test run
+    if (level?.test) k.go("game", { level: 0, deaths: 0, custom: level });
+    else k.go("start", level ?? undefined);
+  }),
+);
 
 // An uncaught error stops Kaplay for good, and on a player's screen that just looks like the game
 // froze. Start over instead — progress lives in localStorage. If the game already started over

@@ -1,8 +1,7 @@
 import type { LevelDef } from "./levels";
+import { joinChunks, type Issue } from "./validate";
 
 export const TILE = 16;
-export const CHUNK_W = 20; // one chunk ≈ one screen
-export const CHUNK_H = 12;
 
 /** How far a bug wanders from its spawn, if a ledge, wall or hazard doesn't stop it sooner. */
 const BUG_PATROL_TILES = 3;
@@ -55,19 +54,11 @@ export interface Level {
 export const PLATFORM_W = 2 * TILE;
 export const PLATFORM_H = 8;
 
-const LEGEND = " =$^~><@F-|";
-
-/** Chunks are 20x12; rows may be written short and are padded with sky. */
-function joinChunks(chunks: string[][]): string[] {
-  chunks.forEach((chunk, i) => {
-    if (chunk.length !== CHUNK_H) throw new Error(`chunk ${i} has ${chunk.length} rows, expected ${CHUNK_H}`);
-    chunk.forEach((row, r) => {
-      if (row.length > CHUNK_W) throw new Error(`chunk ${i} row ${r} is ${row.length} wide, max ${CHUNK_W}: "${row}"`);
-      const bad = [...row].find((ch) => !LEGEND.includes(ch));
-      if (bad) throw new Error(`chunk ${i} row ${r}: "${bad}" is not part of the legend`);
-    });
+/** The map as full-width rows; a malformed chunk throws (the level check catches it first). */
+function toRows(chunks: string[][]): string[] {
+  return joinChunks(chunks, (issue: Issue) => {
+    throw new Error(issue.msg);
   });
-  return Array.from({ length: CHUNK_H }, (_, r) => chunks.map((chunk) => chunk[r].padEnd(CHUNK_W)).join(""));
 }
 
 // horizontal runs of `ch`, then runs with identical extents in consecutive rows fused vertically
@@ -126,7 +117,7 @@ function findPlatforms(map: string[]): Platform[] {
 }
 
 export function parseLevel(def: LevelDef): Level {
-  const map = joinChunks(def.chunks);
+  const map = toRows(def.chunks);
   const rows = map.length;
   const cols = map[0].length;
   const at = (col: number, row: number) => map[row]?.[col] ?? " ";

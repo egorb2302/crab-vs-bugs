@@ -6,7 +6,7 @@ import { addFx, burst, ring } from "../fx";
 import { onPress, setPlaying } from "../input";
 import { COLORS, k } from "../k";
 import { TILE, parseLevel, type Box, type Level } from "../level";
-import { LEVELS } from "../levels";
+import { LEVELS, type LevelDef } from "../levels";
 import { addLighting } from "../light";
 import { hitstop, shake } from "../motion";
 import { duckMusic, playMusic } from "../music";
@@ -15,7 +15,7 @@ import { recordRun } from "../progress";
 import { GRAVITY, addPlayer, stompBounce } from "../player";
 import { sfx } from "../sfx";
 import { THEMES, tileSprite } from "../themes";
-import { addBackdrop, addLabel, fadeIn, fadeTo, formatTime } from "../ui";
+import { addBackdrop, addLabel, fadeIn, fadeTo, formatTime, openEditor } from "../ui";
 import type { RunResult } from "./win";
 
 export interface GameArgs {
@@ -24,6 +24,16 @@ export interface GameArgs {
   deaths: number;
   /** set while playing all levels back to back */
   run?: FullRun;
+  /** a level from the editor or from a shared link, instead of one of LEVELS */
+  custom?: CustomLevel;
+}
+
+export interface CustomLevel {
+  def: LevelDef;
+  /** its link code, to share it again or open it in the editor */
+  code: string;
+  /** opened from the editor's PLAY: Esc goes back there */
+  test: boolean;
 }
 
 export interface FullRun {
@@ -86,7 +96,8 @@ function addCounterIcon(sprite: string, x: number, y: number) {
 export function registerGameScene() {
   k.scene("game", (args: GameArgs = { level: 0, deaths: 0 }) => {
     const index = Math.min(Math.max(args.level, 0), LEVELS.length - 1);
-    const def = LEVELS[index];
+    const custom = args.custom;
+    const def = custom?.def ?? LEVELS[index];
     const theme = THEMES[def.theme];
 
     setPlaying(true);
@@ -157,7 +168,7 @@ export function registerGameScene() {
     let over = false;
     let stompedAt = -1;
     const run = args.run ?? null;
-    const dare = challengeFor(run ? "all" : index);
+    const dare = custom ? null : challengeFor(run ? "all" : index);
     // in a full run the clock keeps going across levels, deaths and restarts
     const clock = () => (run?.elapsed ?? 0) + time;
     const carry = (): FullRun | undefined => (run ? { elapsed: clock() } : undefined);
@@ -175,7 +186,7 @@ export function registerGameScene() {
         color: () => (clock() > dare.time ? COLORS.red : COLORS.muted),
       });
     }
-    const title = run ? `RUN ${index + 1}/${LEVELS.length} - ${def.name}` : `${index + 1}. ${def.name}`;
+    const title = custom ? def.name : run ? `RUN ${index + 1}/${LEVELS.length} - ${def.name}` : `${index + 1}. ${def.name}`;
     addLabel(title, 3, k.height() - 3, { size: 6, color: COLORS.muted, anchor: "botleft" });
 
     function die() {
@@ -195,7 +206,7 @@ export function registerGameScene() {
         corpse.angle += 540 * k.dt();
       });
       hitstop(0.09);
-      k.wait(0.85, () => fadeTo("game", { level: index, deaths: args.deaths + 1, run: carry() }));
+      k.wait(0.85, () => fadeTo("game", { level: index, deaths: args.deaths + 1, run: carry(), custom }));
     }
 
     function win() {
@@ -215,6 +226,7 @@ export function registerGameScene() {
         bugs,
         totalBugs: level.bugs.length,
         deaths: args.deaths,
+        custom,
       };
       if (!run) {
         k.wait(0.9, () => {
@@ -284,12 +296,14 @@ export function registerGameScene() {
       onPress("restart", () => {
         if (over) return;
         over = true;
-        fadeTo("game", { level: index, deaths: args.deaths, run: carry() }, 0.2);
+        fadeTo("game", { level: index, deaths: args.deaths, run: carry(), custom }, 0.2);
       }),
       onPress("back", () => {
         if (over) return;
         over = true;
-        fadeTo("levels", index, 0.15);
+        if (custom?.test) openEditor(custom.code);
+        else if (custom) fadeTo("start", custom, 0.15);
+        else fadeTo("levels", index, 0.15);
       }),
     ];
     k.onSceneLeave(() => off.forEach((fn) => fn()));
